@@ -1,0 +1,18 @@
+menu "IrrigationController configuration"
+
+choice IRRIGATION_TARGET
+    prompt "Board composition"
+    default IRRIGATION_TARGET_DEV_KIT
+    help
+        Selects the HAL and board composition only. Application and domain code
+        remain identical for every target.
+
+config IRRIGATION_TARGET_DEV_KIT
+    bool "DEV_KIT (Freenove FNK0090 ESP32-WROOM board)"
+
+config IRRIGATION_TARGET_IRRIGATION_CONTROLLER
+    bool "IRRIGATION_CONTROLLER (custom PCB placeholder)"
+
+endchoice
+
+endmenu

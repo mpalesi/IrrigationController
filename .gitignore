@@ -1,0 +1,21 @@
+# macOS metadata
+.DS_Store
+
+# Local IDE settings
+.idea/
+.vscode/
+
+# Host test build artifacts
+/build/
+
+# ESP-IDF generated configuration and build artifacts
+/firmware/build/
+/firmware/sdkconfig
+/firmware/sdkconfig.old
+
+# KiCad local history and backups
+/hardware/kicad/IrrigationController/.history/
+/hardware/kicad/IrrigationController/_restore_backup_*/
+/hardware/kicad/IrrigationController/backup-*/
+/hardware/kicad/IrrigationController/*.OLD.kicad_pcb
+/hardware/kicad/IrrigationController/*.kicad_prl

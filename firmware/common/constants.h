@@ -1,0 +1,3 @@
+#pragma once
+
+#define IRRIGATION_LOCAL_OUTPUT_COUNT 8U

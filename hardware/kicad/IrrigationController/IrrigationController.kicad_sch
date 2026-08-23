@@ -1,0 +1,1418 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "ae4fa1fa-5ce3-4fe9-9e0a-2bca3bda685d")
+	(paper "A4")
+	(lib_symbols)
+	(no_connect
+		(at 57.15 27.94)
+		(uuid "33467dfc-3664-44b4-9882-25e35cb7adcf")
+	)
+	(no_connect
+		(at 57.15 25.4)
+		(uuid "33a65752-2e43-4e68-9672-3056864fe3cb")
+	)
+	(no_connect
+		(at 57.15 30.48)
+		(uuid "d4a12541-7b3c-4609-84b3-b034b6aa4597")
+	)
+	(wire
+		(pts
+			(xy 106.68 96.52) (xy 106.68 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0712566a-5e93-45c6-b2e5-82671e35428e")
+	)
+	(wire
+		(pts
+			(xy 111.76 63.5) (xy 111.76 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0a896a8e-031d-4013-a63d-aba3e33e1a44")
+	)
+	(wire
+		(pts
+			(xy 71.12 43.18) (xy 93.98 43.18)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "107b31a2-20a4-4c6c-83b2-df2676fafa7c")
+	)
+	(wire
+		(pts
+			(xy 114.3 96.52) (xy 114.3 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "15917570-efdd-4281-b6ba-64ef7633c5a0")
+	)
+	(wire
+		(pts
+			(xy 99.06 135.89) (xy 99.06 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1eb4f089-3dbe-4770-be92-06f8d504ccaa")
+	)
+	(wire
+		(pts
+			(xy 130.81 148.59) (xy 130.81 43.18)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "20a15daf-af00-4ed7-85e7-8c1d62552cd5")
+	)
+	(wire
+		(pts
+			(xy 91.44 120.65) (xy 93.98 120.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "24b379c8-aeb7-4ae1-a0cd-0af20b12d063")
+	)
+	(wire
+		(pts
+			(xy 130.81 43.18) (xy 116.84 43.18)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "295cb296-bdfc-408a-89c2-8b86af932425")
+	)
+	(wire
+		(pts
+			(xy 106.68 63.5) (xy 106.68 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2e21e4f3-3253-47de-bc48-1e249df1fcc1")
+	)
+	(wire
+		(pts
+			(xy 91.44 144.78) (xy 91.44 120.65)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3395ecc8-3efd-473c-bdcd-e4f5e80f45ef")
+	)
+	(wire
+		(pts
+			(xy 71.12 52.07) (xy 93.98 52.07)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3a887586-083a-45c0-8325-0512df79c1fd")
+	)
+	(wire
+		(pts
+			(xy 96.52 96.52) (xy 96.52 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3dbe74d7-3b0e-43b6-8c74-74d6f2a00222")
+	)
+	(wire
+		(pts
+			(xy 114.3 135.89) (xy 114.3 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4e5098c9-b1a6-4937-b90a-7e0e2e5f4f0b")
+	)
+	(wire
+		(pts
+			(xy 101.6 63.5) (xy 101.6 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4e53556c-d22f-4a9d-9017-7062b603b91a")
+	)
+	(wire
+		(pts
+			(xy 96.52 63.5) (xy 96.52 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "527b1d2a-ef9a-4062-aec7-c4e64e9e88d4")
+	)
+	(wire
+		(pts
+			(xy 96.52 135.89) (xy 96.52 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5d8a1041-57aa-4470-88eb-9d86b9bae2de")
+	)
+	(wire
+		(pts
+			(xy 71.12 45.72) (xy 93.98 45.72)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5e5af96c-4873-4c7f-be2a-280a4a4a521b")
+	)
+	(wire
+		(pts
+			(xy 127 151.13) (xy 134.62 151.13)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "61ad6822-4933-4c23-b636-c82600fd3050")
+	)
+	(wire
+		(pts
+			(xy 104.14 63.5) (xy 104.14 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6b0fa93e-4695-4c54-8cce-d4a98e6292ad")
+	)
+	(wire
+		(pts
+			(xy 134.62 151.13) (xy 134.62 45.72)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7b0b04ea-19bf-4f1e-9c5f-6c579caad1c7")
+	)
+	(wire
+		(pts
+			(xy 109.22 63.5) (xy 109.22 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7b66f225-f983-45c7-9016-9c37237e4095")
+	)
+	(wire
+		(pts
+			(xy 109.22 135.89) (xy 109.22 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "81b6959b-e242-4a0f-9e5b-401d70ae7801")
+	)
+	(wire
+		(pts
+			(xy 104.14 96.52) (xy 104.14 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8a5d0433-5890-4043-a919-cee71c6ef125")
+	)
+	(wire
+		(pts
+			(xy 111.76 135.89) (xy 111.76 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8c4633f6-1ce4-438f-a28b-b5e85929e312")
+	)
+	(wire
+		(pts
+			(xy 71.12 25.4) (xy 93.98 25.4)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8fd4f719-8bd7-45de-a07d-7426ee4c9635")
+	)
+	(wire
+		(pts
+			(xy 127 148.59) (xy 130.81 148.59)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "90e4ed45-ced4-433f-af05-a592541564fa")
+	)
+	(wire
+		(pts
+			(xy 116.84 45.72) (xy 134.62 45.72)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9235c482-1bdd-4fcd-a676-2a4f5f902414")
+	)
+	(wire
+		(pts
+			(xy 71.12 30.48) (xy 93.98 30.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9b8aa14e-947e-4386-b235-c6385f7e55ac")
+	)
+	(wire
+		(pts
+			(xy 111.76 96.52) (xy 111.76 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a3a34c48-c259-4e64-83b2-840caeea29a5")
+	)
+	(wire
+		(pts
+			(xy 109.22 96.52) (xy 109.22 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "aafd19c2-15b8-4764-9290-b6cc95162de7")
+	)
+	(wire
+		(pts
+			(xy 114.3 63.5) (xy 114.3 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b28070ce-beed-40ec-954c-d4a096e32611")
+	)
+	(wire
+		(pts
+			(xy 101.6 96.52) (xy 101.6 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b587ade0-51a4-4b20-a627-f98f1f40d2a5")
+	)
+	(wire
+		(pts
+			(xy 99.06 96.52) (xy 99.06 105.41)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ba3730b0-9ba4-465f-84c6-e29cc27fdd89")
+	)
+	(wire
+		(pts
+			(xy 106.68 135.89) (xy 106.68 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c23f9fe4-68e4-4f83-a33e-112f1e7605ba")
+	)
+	(wire
+		(pts
+			(xy 99.06 63.5) (xy 99.06 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c34e9179-df37-4036-914c-bcc62013a6d5")
+	)
+	(wire
+		(pts
+			(xy 101.6 135.89) (xy 101.6 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c7a78d40-91e0-488e-a56e-bae4b4e7fe38")
+	)
+	(wire
+		(pts
+			(xy 104.14 135.89) (xy 104.14 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e744b200-705c-4327-b26c-529096e82074")
+	)
+	(wire
+		(pts
+			(xy 71.12 49.53) (xy 93.98 49.53)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ec1a1b87-340a-424e-af6c-ff7a1b12164f")
+	)
+	(sheet
+		(at 93.98 105.41)
+		(size 22.86 30.48)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "3059b112-ef62-478e-8cee-3bdc4ddd7be1")
+		(property "Sheetname" "RelayArray"
+			(at 93.98 104.6984 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "RelayArray.kicad_sch"
+			(at 93.98 136.4746 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "24VAC_IN" input
+			(at 93.98 120.65 180)
+			(uuid "d2fd0486-2ae2-4506-85f8-03bd8c6bb0fe")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY5_DRV" input
+			(at 106.68 105.41 90)
+			(uuid "e1257e44-dad0-4285-a304-a21b0e5cd12e")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY2_DRV" input
+			(at 99.06 105.41 90)
+			(uuid "cf8ab107-582e-4422-a522-8c7856c071f0")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY6_DRV" input
+			(at 109.22 105.41 90)
+			(uuid "0e603d46-eccb-40d8-a84d-39df4ba41c7c")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY3_DRV" input
+			(at 101.6 105.41 90)
+			(uuid "79beb6db-5cd9-43d2-97df-469e249bff17")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY4_DRV" input
+			(at 104.14 105.41 90)
+			(uuid "d6ea9c53-7b55-46b2-98a4-9e9d3481a105")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY7_NO" output
+			(at 111.76 135.89 270)
+			(uuid "6e17dc0d-a1e6-4a75-b2a1-90cc91c06794")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY1_NO" output
+			(at 96.52 135.89 270)
+			(uuid "a1383081-f2e4-4ac9-b001-62e8961bd6ca")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY5_NO" output
+			(at 106.68 135.89 270)
+			(uuid "edbb24c8-7b18-45d6-b1ad-6efe42fd773d")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY3_NO" output
+			(at 101.6 135.89 270)
+			(uuid "b18b1cec-8675-4e49-99b3-e7dfc8a38e39")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY6_NO" output
+			(at 109.22 135.89 270)
+			(uuid "309a6fdb-72c8-4f83-b529-44b5258ed833")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY8_NO" output
+			(at 114.3 135.89 270)
+			(uuid "c316de12-a4a3-4c5d-ae3f-fbcec40c688b")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY4_NO" output
+			(at 104.14 135.89 270)
+			(uuid "acf87e61-77db-4dcf-a4b3-4be2b578de6e")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY8_DRV" input
+			(at 114.3 105.41 90)
+			(uuid "63df818b-0161-4800-85c8-cee3f72cb5b9")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY2_NO" output
+			(at 99.06 135.89 270)
+			(uuid "ac37b6c3-505c-4aee-9756-fa80022829bd")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY7_DRV" input
+			(at 111.76 105.41 90)
+			(uuid "dd42b6df-a8ba-4e9d-9ab8-8ee460745fde")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY1_DRV" input
+			(at 96.52 105.41 90)
+			(uuid "dcf1842c-9520-4f9a-9abc-b8f63e1bb318")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "IrrigationController"
+				(path "/ae4fa1fa-5ce3-4fe9-9e0a-2bca3bda685d"
+					(page "7")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 93.98 73.66)
+		(size 22.86 22.86)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "3b0bc1d8-954d-4d46-ba3b-92f62b176d22")
+		(property "Sheetname" "Drivers"
+			(at 93.2684 96.52 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "Drivers.kicad_sch"
+			(at 117.4246 96.52 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "RELAY2_DRV" output
+			(at 99.06 96.52 270)
+			(uuid "6b2513a6-972e-40e8-af76-e250dd1b5799")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY3" input
+			(at 101.6 73.66 90)
+			(uuid "892f03a6-255d-4f03-849c-cd3c10d34f90")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY7_DRV" output
+			(at 111.76 96.52 270)
+			(uuid "5d859f6b-f564-4cba-84bc-f88edaa99f65")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY7" input
+			(at 111.76 73.66 90)
+			(uuid "1af78932-2e81-4932-bba7-9d8d53d0b7b3")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY1_DRV" output
+			(at 96.52 96.52 270)
+			(uuid "a1c8d679-2ce7-4ffd-b175-b706fff306d6")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY6" input
+			(at 109.22 73.66 90)
+			(uuid "8ab74278-7f53-4c95-b4af-a259cf303877")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY8" input
+			(at 114.3 73.66 90)
+			(uuid "2ca33b90-4b9b-4536-9884-d0054805d844")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY4" input
+			(at 104.14 73.66 90)
+			(uuid "cdea86d8-c778-40ab-ab74-2fa07c87628c")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY1" input
+			(at 96.52 73.66 90)
+			(uuid "4276c201-0c11-4a76-bea0-316db8f34830")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY5" input
+			(at 106.68 73.66 90)
+			(uuid "bc1bdb87-5861-469e-9c1b-0c4d6f749ae9")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY2" input
+			(at 99.06 73.66 90)
+			(uuid "fa1cb128-03b5-4141-903a-90696466b3cb")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY6_DRV" output
+			(at 109.22 96.52 270)
+			(uuid "c73e71ad-bf3e-4e47-a1a0-e84085012102")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY8_DRV" output
+			(at 114.3 96.52 270)
+			(uuid "7db23c4e-752d-49a8-ab10-6dd45da921eb")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY5_DRV" output
+			(at 106.68 96.52 270)
+			(uuid "c0b39c71-be49-4255-8fff-eca86c35e014")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY3_DRV" output
+			(at 101.6 96.52 270)
+			(uuid "d97510b2-09ae-4fb5-9560-0f3a968cdcea")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY4_DRV" output
+			(at 104.14 96.52 270)
+			(uuid "666fd788-7a04-4e66-9a86-282c53f615db")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "IrrigationController"
+				(path "/ae4fa1fa-5ce3-4fe9-9e0a-2bca3bda685d"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 93.98 41.148)
+		(size 22.86 22.352)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "43f7acce-c212-4529-b794-8e1d67188bb3")
+		(property "Sheetname" "MCP23017"
+			(at 93.98 40.4364 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "MCP23017.kicad_sch"
+			(at 93.98 64.0846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "RELAY2" output
+			(at 99.06 63.5 270)
+			(uuid "505dc273-b224-4ff0-bab6-402df1aefe2e")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY3" output
+			(at 101.6 63.5 270)
+			(uuid "0f2951dc-9084-4685-8e50-73893eefab76")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "INPUT1" input
+			(at 116.84 43.18 0)
+			(uuid "bf313164-12f6-4d0d-8c70-ed41503c6cf4")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY1" output
+			(at 96.52 63.5 270)
+			(uuid "f6024100-17ed-4136-9c46-d76c07079326")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "SDA" bidirectional
+			(at 93.98 43.18 180)
+			(uuid "0b9ccac9-2032-4f97-9baa-be985fa110e0")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "SCL" bidirectional
+			(at 93.98 45.72 180)
+			(uuid "cb4bc244-f395-471b-bbbc-b5ce7b095557")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY5" output
+			(at 106.68 63.5 270)
+			(uuid "b6120911-8deb-4daa-ae7d-660cd3cbd24d")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "MCP_INTA" output
+			(at 93.98 49.53 180)
+			(uuid "df84d0e9-f6ad-47e5-9503-9f476babd32f")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "INPUT2" input
+			(at 116.84 45.72 0)
+			(uuid "b69e5298-5e5c-4df0-a0d0-8e7a539671e6")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY6" output
+			(at 109.22 63.5 270)
+			(uuid "30d910cc-de9d-4bbe-bc46-def00412c8f2")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY4" output
+			(at 104.14 63.5 270)
+			(uuid "804cba43-4c6d-4c21-aa64-b2228fc16553")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY8" output
+			(at 114.3 63.5 270)
+			(uuid "8aa2c49a-2922-4418-9d75-0b47102783ac")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "RELAY7" output
+			(at 111.76 63.5 270)
+			(uuid "acd12cbd-b6e5-49cf-9e2a-44918c04a365")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "MCP_INTB" output
+			(at 93.98 52.07 180)
+			(uuid "5feb6f31-f6da-43c8-9f4d-8d3c7b12751b")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "IrrigationController"
+				(path "/ae4fa1fa-5ce3-4fe9-9e0a-2bca3bda685d"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 93.98 20.32)
+		(size 22.86 13.97)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "52054a82-92c6-4169-87da-9d36e0a59d73")
+		(property "Sheetname" "DC_Power"
+			(at 93.98 19.6084 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "DC_Power.kicad_sch"
+			(at 93.98 34.8746 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "N_SW" input
+			(at 93.98 30.48 180)
+			(uuid "fc8de9ae-1964-4986-b3fd-bc0cdbb36475")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "L_SW" input
+			(at 93.98 25.4 180)
+			(uuid "de85c62d-b0e5-45f4-9f30-e1087b1e07a4")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "IrrigationController"
+				(path "/ae4fa1fa-5ce3-4fe9-9e0a-2bca3bda685d"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 88.9 144.78)
+		(size 38.1 13.97)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "737aa793-890c-47cb-9ee6-d7d1c1b73252")
+		(property "Sheetname" "TerminalBlocks"
+			(at 88.9 144.0684 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "TerminalBlocks.kicad_sch"
+			(at 88.9 159.3346 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "24VAC_IN" output
+			(at 91.44 144.78 90)
+			(uuid "8d8e73a8-9594-4495-b750-dd696d53faeb")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY8_NO" input
+			(at 114.3 144.78 90)
+			(uuid "7eaccb01-278e-4f7a-9ec8-3155bf346a4d")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY6_NO" input
+			(at 109.22 144.78 90)
+			(uuid "7ff44152-667b-4095-b406-46b19a8db67d")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "INPUT2" output
+			(at 127 151.13 0)
+			(uuid "a55b071a-c950-40fc-a7a7-8dffdc58c5ae")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY2_NO" input
+			(at 99.06 144.78 90)
+			(uuid "06ba8144-1d7f-431b-8381-9a35598eab1f")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY5_NO" input
+			(at 106.68 144.78 90)
+			(uuid "d1db68ec-0761-4dba-97bc-6ca4a043b2c0")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "INPUT1" output
+			(at 127 148.59 0)
+			(uuid "0752483b-42bf-4c70-8cd7-17135effc8a8")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY4_NO" input
+			(at 104.14 144.78 90)
+			(uuid "6fc942f4-f51a-457f-9ce5-d2c53ace6f61")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY7_NO" input
+			(at 111.76 144.78 90)
+			(uuid "35019660-351c-467c-9ea7-c95a651e145d")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY1_NO" input
+			(at 96.52 144.78 90)
+			(uuid "58baabc1-fd5a-4553-98cd-43ae2ae1b08d")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "RELAY3_NO" input
+			(at 101.6 144.78 90)
+			(uuid "a668055a-78f3-44c2-b9aa-16f44c406463")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "IrrigationController"
+				(path "/ae4fa1fa-5ce3-4fe9-9e0a-2bca3bda685d"
+					(page "8")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 57.15 22.86)
+		(size 13.97 10.16)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "9bc81e97-ab4c-4ae1-bf4f-4cd8929c367b")
+		(property "Sheetname" "AC_Input"
+			(at 57.15 22.1484 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "AC_Input.kicad_sch"
+			(at 57.15 33.6046 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "L_SW" output
+			(at 71.12 25.4 0)
+			(uuid "0be1dece-e142-4ffc-81a2-7c4cd8ec2d7c")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "N_SW" output
+			(at 71.12 30.48 0)
+			(uuid "e2c67c10-42f2-4e72-b0c1-a5cc83756bc8")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "N" input
+			(at 57.15 27.94 180)
+			(uuid "0cfcd7a7-11c8-460c-8be2-19c868fd973a")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "PE" input
+			(at 57.15 30.48 180)
+			(uuid "68663bef-9db0-4cf4-9e75-332087fb1ca2")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "L" input
+			(at 57.15 25.4 180)
+			(uuid "3d8b66da-62bf-468d-91f6-f98ca76262bd")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "IrrigationController"
+				(path "/ae4fa1fa-5ce3-4fe9-9e0a-2bca3bda685d"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 55.88 40.64)
+		(size 15.24 13.97)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "f31d3263-8519-4138-b9dc-0cdb13ba9fcb")
+		(property "Sheetname" "ESP32"
+			(at 55.88 39.9284 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "ESP32.kicad_sch"
+			(at 55.88 55.1946 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "SCL" bidirectional
+			(at 71.12 45.72 0)
+			(uuid "95a84e68-8ecd-4e40-87bc-2e90c9859eb3")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "SDA" bidirectional
+			(at 71.12 43.18 0)
+			(uuid "54a2e176-f71f-412c-b7ee-3be1262b3dde")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "MCP_INTA" input
+			(at 71.12 49.53 0)
+			(uuid "62de09e1-18bc-4c4f-b803-6f017df807aa")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "MCP_INTB" input
+			(at 71.12 52.07 0)
+			(uuid "9c250c12-fc12-49df-a61e-2a951a6d8bdb")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "IrrigationController"
+				(path "/ae4fa1fa-5ce3-4fe9-9e0a-2bca3bda685d"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
+)

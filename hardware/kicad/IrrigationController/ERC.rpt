@@ -1,0 +1,47 @@
+ERC report (2026-08-03T16:07:58, Encoding UTF8)
+Report includes: Errors, Warnings, Exclusions
+
+***** Sheet /
+[pin_not_connected]: Pin not connected
+    ; error
+    @(3600 mils, 2500 mils): Pin foglio gerarchico 'L'
+[pin_not_connected]: Pin not connected
+    ; error
+    @(3600 mils, 2600 mils): Pin foglio gerarchico 'N'
+[pin_not_connected]: Pin not connected
+    ; error
+    @(3600 mils, 2700 mils): Pin foglio gerarchico 'PE'
+[isolated_pin_label]: Label connected to only one pin
+    ; warning
+    @(1100 mils, 1300 mils): Etichetta gerarchica 'PE'
+[isolated_pin_label]: Label connected to only one pin
+    ; warning
+    @(1250 mils, 1300 mils): Etichetta "PE"
+
+***** Sheet /AC_Input/
+
+***** Sheet /DC_Power/
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(1900 mils, 2700 mils): Symbol U201 Pin 2 [AC/L, Ingresso potenza, Linea]
+[power_pin_not_driven]: Input Power pin not driven by any Output Power pins
+    ; error
+    @(1900 mils, 2900 mils): Symbol U201 Pin 1 [AC/N, Ingresso potenza, Linea]
+
+***** Sheet /ESP32/
+
+***** Sheet /MCP23017/
+
+***** Sheet /Drivers/
+
+***** Sheet /RelayArray/
+
+***** Sheet /TerminalBlocks/
+
+ ** ERC messages: 7  Errors 5  Warnings 2
+
+ ** Ignored checks:
+    - Global label only appears once in the schematic
+    - Four connection points are joined together
+    - SPICE model issue
+    - Assigned footprint doesn't match footprint filters
