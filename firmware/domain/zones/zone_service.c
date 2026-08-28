@@ -62,6 +62,9 @@ static IrrigationResult zone_service_open_locked(ZoneService *service, const cha
     if (zone.state != ZONE_STATE_IDLE) {
         return IRRIGATION_RESULT_INVALID_STATE;
     }
+    if (state.master_valve.state != MASTER_VALVE_STATE_OPEN) {
+        return IRRIGATION_RESULT_INVALID_STATE;
+    }
     for (size_t index = 0U; index < IRRIGATION_MAX_OUTPUTS; ++index) {
         if (state.output_states[index] != OUTPUT_STATE_OFF) {
             return IRRIGATION_RESULT_INVALID_STATE;

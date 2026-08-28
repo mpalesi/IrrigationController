@@ -35,6 +35,49 @@ typedef enum {
     OUTPUT_STATE_UNKNOWN,
 } OutputState;
 
+typedef enum {
+    MASTER_VALVE_STATE_CLOSED = 0,
+    MASTER_VALVE_STATE_OPENING,
+    MASTER_VALVE_STATE_OPEN,
+    MASTER_VALVE_STATE_CLOSING,
+    MASTER_VALVE_STATE_FAULT,
+} MasterValveState;
+
+typedef enum {
+    PROGRAM_STATE_IDLE = 0,
+    PROGRAM_STATE_WAITING_MASTER,
+    PROGRAM_STATE_RUNNING_ZONE,
+    PROGRAM_STATE_WAITING_POST_PROGRAM_DELAY,
+    PROGRAM_STATE_COMPLETED,
+    PROGRAM_STATE_ABORTED,
+    PROGRAM_STATE_FAULT,
+} ProgramState;
+
+typedef enum {
+    SCHEDULE_OCCURRENCE_NONE = 0,
+    SCHEDULE_OCCURRENCE_STARTED,
+    SCHEDULE_OCCURRENCE_SKIPPED_BUSY,
+    SCHEDULE_OCCURRENCE_REJECTED,
+} ScheduleOccurrenceStatus;
+
+typedef struct {
+    MasterValveState state;
+    uint64_t opening_confirmed_at_ms;
+    uint32_t pre_open_delay_ms;
+} MasterValveRuntimeState;
+
+typedef struct {
+    ProgramState state;
+    size_t current_step_index;
+    uint64_t step_started_at_ms;
+} ProgramRuntimeState;
+
+typedef struct {
+    uint64_t last_handled_occurrence[IRRIGATION_MAX_SCHEDULES];
+    ScheduleOccurrenceStatus last_occurrence_status[IRRIGATION_MAX_SCHEDULES];
+    size_t entry_count;
+} SchedulerRuntimeState;
+
 typedef struct {
     const char *zone_id;
     const char *output_id;
@@ -47,6 +90,9 @@ typedef struct {
 typedef struct {
     SystemState system_state;
     OutputState output_states[IRRIGATION_MAX_OUTPUTS];
+    MasterValveRuntimeState master_valve;
+    ProgramRuntimeState program;
+    SchedulerRuntimeState scheduler;
     ZoneRuntimeState zones[IRRIGATION_MAX_ZONES];
     size_t zone_count;
 } RuntimeState;
@@ -67,3 +113,19 @@ IrrigationResult state_store_open_zone(StateStore *store, const char *zone_id, u
 IrrigationResult state_store_close_zone(StateStore *store, const char *zone_id);
 IrrigationResult state_store_record_zone_actuation_fault(StateStore *store, const char *zone_id,
                                                           OutputState output_state);
+IrrigationResult state_store_configure_master_valve(StateStore *store, uint32_t pre_open_delay_ms);
+IrrigationResult state_store_begin_master_valve_open(StateStore *store, uint64_t confirmed_at_ms);
+IrrigationResult state_store_complete_master_valve_pre_open_delay(StateStore *store, uint64_t now_ms);
+IrrigationResult state_store_begin_master_valve_close(StateStore *store);
+IrrigationResult state_store_complete_master_valve_close(StateStore *store);
+IrrigationResult state_store_record_master_valve_fault(StateStore *store);
+bool state_store_master_valve_close_is_eligible(const StateStore *store);
+IrrigationResult state_store_start_program(StateStore *store);
+IrrigationResult state_store_set_program_running_zone(StateStore *store, size_t step_index,
+                                                       uint64_t started_at_ms);
+IrrigationResult state_store_set_program_waiting_post_delay(StateStore *store, uint64_t started_at_ms);
+IrrigationResult state_store_set_program_terminal(StateStore *store, ProgramState state);
+IrrigationResult state_store_configure_scheduler(StateStore *store, size_t entry_count);
+IrrigationResult state_store_record_schedule_occurrence(StateStore *store, size_t entry_index,
+                                                         uint64_t occurrence,
+                                                         ScheduleOccurrenceStatus status);

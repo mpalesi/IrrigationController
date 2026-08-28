@@ -14,6 +14,10 @@ add_executable(unit_tests
     ../firmware/app/events/event_bus.c
     ../firmware/domain/zones/zone_service.c
     ../firmware/domain/zones/zone_start_precondition.c
+    ../firmware/domain/master_valve/master_valve_driver.c
+    ../firmware/domain/master_valve/master_valve_service.c
+    ../firmware/domain/programs/program_service.c
+    ../firmware/domain/scheduler/scheduler_service.c
     ../firmware/infrastructure/logging/logger.c
     ../firmware/hal/outputs/output_driver.c
     ../firmware/hal/outputs/virtual_output_driver.c
