@@ -1,8 +1,12 @@
 set(IRRIGATION_SOURCES
     "system_ready.c"
     "../app/state/state_store.c"
+    "../app/clock.c"
     "../app/commands/command_bus.c"
+    "../app/commands/zone_command_handler.c"
     "../app/events/event_bus.c"
+    "../domain/zones/zone_service.c"
+    "../domain/zones/zone_start_precondition.c"
     "../infrastructure/logging/logger.c"
     "../infrastructure/logging/esp_idf_logger.c"
     "../hal/outputs/output_driver.c"

@@ -8,7 +8,8 @@
 
 typedef struct {
     OutputDriver base;
-    bool outputs[IRRIGATION_LOCAL_OUTPUT_COUNT];
+    /* Last hardware state reported by this test double; State Store owns logical state. */
+    bool reported_outputs[IRRIGATION_LOCAL_OUTPUT_COUNT];
     Logger logger;
 } VirtualOutputDriver;
 
