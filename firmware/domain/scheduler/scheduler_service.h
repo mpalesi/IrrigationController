@@ -38,4 +38,5 @@ void scheduler_service_init(SchedulerService *service, StateStore *state_store,
                             ProgramService *program_service);
 IrrigationResult scheduler_service_configure(SchedulerService *service, const SchedulerEntry *entries,
                                              size_t entry_count);
+IrrigationResult scheduler_service_set_enabled(SchedulerService *service, size_t entry_index, bool enabled);
 IrrigationResult scheduler_service_process(SchedulerService *service, SchedulerTime now);

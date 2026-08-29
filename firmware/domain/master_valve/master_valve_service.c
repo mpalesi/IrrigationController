@@ -1,5 +1,7 @@
 #include "domain/master_valve/master_valve_service.h"
 
+#include <stdio.h>
+
 static bool operation_lock_acquire(MasterValveService *service)
 {
     return !atomic_flag_test_and_set_explicit(&service->operation_lock, memory_order_acquire);
@@ -30,13 +32,18 @@ IrrigationResult master_valve_service_open(MasterValveService *service)
         !operation_lock_acquire(service)) {
         return IRRIGATION_RESULT_REJECTED;
     }
-    if (state_store_snapshot(service->state_store).master_valve.state != MASTER_VALVE_STATE_CLOSED) {
+    MasterValveState state = state_store_snapshot(service->state_store).master_valve.state;
+    printf("master_valve: open requested state=%d\n", state);
+    if (state != MASTER_VALVE_STATE_CLOSED) {
         operation_lock_release(service);
         return IRRIGATION_RESULT_INVALID_STATE;
     }
     IrrigationResult result = master_valve_driver_open_and_confirm(service->driver);
+    printf("master_valve: driver open result=%d\n", result);
     if (result == IRRIGATION_RESULT_OK) {
         result = state_store_begin_master_valve_open(service->state_store, clock_now_ms(&service->clock));
+        printf("master_valve: open state=%d result=%d\n",
+               state_store_snapshot(service->state_store).master_valve.state, result);
     }
     if (result != IRRIGATION_RESULT_OK) {
         (void)state_store_record_master_valve_fault(service->state_store);
@@ -57,6 +64,8 @@ IrrigationResult master_valve_service_process_time(MasterValveService *service)
                                                                     clock_now_ms(&service->clock));
         if (result == IRRIGATION_RESULT_TIMEOUT) {
             result = IRRIGATION_RESULT_OK;
+        } else if (result == IRRIGATION_RESULT_OK) {
+            printf("master_valve: state OPENING -> OPEN\n");
         }
     }
     operation_lock_release(service);
@@ -69,14 +78,18 @@ IrrigationResult master_valve_service_close(MasterValveService *service)
         !operation_lock_acquire(service)) {
         return IRRIGATION_RESULT_REJECTED;
     }
+    printf("master_valve: close requested state=%d\n", state_store_snapshot(service->state_store).master_valve.state);
     IrrigationResult result = state_store_begin_master_valve_close(service->state_store);
     if (result != IRRIGATION_RESULT_OK) {
         operation_lock_release(service);
         return result;
     }
     result = master_valve_driver_close_and_confirm(service->driver);
+    printf("master_valve: driver close result=%d\n", result);
     if (result == IRRIGATION_RESULT_OK) {
         result = state_store_complete_master_valve_close(service->state_store);
+        printf("master_valve: close state=%d result=%d\n",
+               state_store_snapshot(service->state_store).master_valve.state, result);
     }
     if (result != IRRIGATION_RESULT_OK) {
         (void)state_store_record_master_valve_fault(service->state_store);

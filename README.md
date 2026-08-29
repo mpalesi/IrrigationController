@@ -4,6 +4,9 @@ Milestone 1 is an ESP-IDF 5.5.5 foundation for the Freenove FNK0090 `DEV_KIT`.
 The application core uses only logical output IDs; board selection happens in the
 HAL board-composition layer.
 
+For the DEV_KIT web test, local zones 1-8 use GPIO 16, 17, 18, 19, 21, 22, 23,
+and 25 respectively. The development-only Master Valve driver uses GPIO 26.
+
 ## Host tests
 
 ```sh

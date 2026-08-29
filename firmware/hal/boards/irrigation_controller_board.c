@@ -12,3 +12,8 @@ OutputDriver *board_output_driver(void)
     }
     return &driver.base;
 }
+
+MasterValveDriver *board_master_valve_driver(void)
+{
+    return NULL;
+}

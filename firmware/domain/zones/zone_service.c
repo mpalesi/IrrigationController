@@ -1,5 +1,7 @@
 #include "domain/zones/zone_service.h"
 
+#include <stdio.h>
+
 static void publish_zone_event(ZoneService *service, EventType type, const char *zone_id)
 {
     const Event event = {
@@ -59,19 +61,25 @@ static IrrigationResult zone_service_open_locked(ZoneService *service, const cha
         return result;
     }
     RuntimeState state = state_store_snapshot(service->state_store);
+    printf("zone_service: open requested zone=%s master=%d system=%d\n", zone_id,
+           state.master_valve.state, state.system_state);
     if (zone.state != ZONE_STATE_IDLE) {
+        printf("zone_service: open rejected zone state=%d\n", zone.state);
         return IRRIGATION_RESULT_INVALID_STATE;
     }
     if (state.master_valve.state != MASTER_VALVE_STATE_OPEN) {
+        printf("zone_service: open rejected master state=%d\n", state.master_valve.state);
         return IRRIGATION_RESULT_INVALID_STATE;
     }
     for (size_t index = 0U; index < IRRIGATION_MAX_OUTPUTS; ++index) {
         if (state.output_states[index] != OUTPUT_STATE_OFF) {
+            printf("zone_service: open rejected active output=%u\n", (unsigned)index);
             return IRRIGATION_RESULT_INVALID_STATE;
         }
     }
     result = zone_start_precondition_check(&service->start_precondition);
     if (result != IRRIGATION_RESULT_OK) {
+        printf("zone_service: open rejected precondition result=%d\n", result);
         return result;
     }
     if (state.system_state == SYSTEM_STATE_READY) {
@@ -85,10 +93,12 @@ static IrrigationResult zone_service_open_locked(ZoneService *service, const cha
     uint32_t configured_duration;
     result = state_store_prepare_zone_open(service->state_store, zone_id, &output_index, &configured_duration);
     if (result != IRRIGATION_RESULT_OK) {
+        printf("zone_service: open rejected state prepare result=%d\n", result);
         return result;
     }
     const uint32_t effective_duration = duration_ms == 0U ? configured_duration : duration_ms;
     result = output_driver_set(service->output_driver, output_index, true);
+    printf("zone_service: driver open zone=%s result=%d\n", zone_id, result);
     if (result != IRRIGATION_RESULT_OK) {
         IrrigationResult safe_off = output_driver_set(service->output_driver, output_index, false);
         (void)fault_zone(service, zone_id,
@@ -102,6 +112,7 @@ static IrrigationResult zone_service_open_locked(ZoneService *service, const cha
         return result;
     }
     publish_zone_event(service, EVENT_TYPE_ZONE_OPENED, zone_id);
+    printf("zone_service: open complete zone=%s state=OPEN\n", zone_id);
     return IRRIGATION_RESULT_OK;
 }
 
@@ -127,9 +138,11 @@ static IrrigationResult zone_service_close_locked(ZoneService *service, const ch
         return result;
     }
     if (zone.state != ZONE_STATE_OPEN && zone.state != ZONE_STATE_FAULT) {
+        printf("zone_service: close rejected zone=%s state=%d\n", zone_id, zone.state);
         return IRRIGATION_RESULT_INVALID_STATE;
     }
     result = output_driver_set(service->output_driver, zone.output_index, false);
+    printf("zone_service: driver close zone=%s result=%d\n", zone_id, result);
     if (result != IRRIGATION_RESULT_OK) {
         (void)fault_zone(service, zone_id, OUTPUT_STATE_UNKNOWN);
         return result;
@@ -137,6 +150,7 @@ static IrrigationResult zone_service_close_locked(ZoneService *service, const ch
     result = state_store_close_zone(service->state_store, zone_id);
     if (result == IRRIGATION_RESULT_OK) {
         publish_zone_event(service, EVENT_TYPE_ZONE_CLOSED, zone_id);
+        printf("zone_service: close complete zone=%s\n", zone_id);
     }
     return result;
 }

@@ -44,6 +44,15 @@ IrrigationResult scheduler_service_configure(SchedulerService *service, const Sc
     return state_store_configure_scheduler(service->state_store, entry_count);
 }
 
+IrrigationResult scheduler_service_set_enabled(SchedulerService *service, size_t entry_index, bool enabled)
+{
+    if (service == NULL || entry_index >= service->entry_count) {
+        return IRRIGATION_RESULT_NOT_FOUND;
+    }
+    service->entries[entry_index].enabled = enabled;
+    return state_store_configure_scheduler(service->state_store, service->entry_count);
+}
+
 IrrigationResult scheduler_service_process(SchedulerService *service, SchedulerTime now)
 {
     if (service == NULL || service->state_store == NULL || service->program_service == NULL ||

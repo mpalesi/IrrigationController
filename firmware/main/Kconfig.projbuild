@@ -15,4 +15,12 @@ config IRRIGATION_TARGET_IRRIGATION_CONTROLLER
 
 endchoice
 
+config IRRIGATION_WIFI_SSID
+    string "DEV_KIT Wi-Fi SSID"
+    default ""
+
+config IRRIGATION_WIFI_PASSWORD
+    string "DEV_KIT Wi-Fi password"
+    default ""
+
 endmenu

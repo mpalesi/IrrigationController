@@ -1,5 +1,6 @@
 set(IRRIGATION_SOURCES
     "system_ready.c"
+    "../interfaces/http/dev_kit_web.c"
     "../app/state/state_store.c"
     "../app/clock.c"
     "../app/commands/command_bus.c"
@@ -19,7 +20,8 @@ set(IRRIGATION_SOURCES
 if(CONFIG_IRRIGATION_TARGET_DEV_KIT)
     list(APPEND IRRIGATION_SOURCES
         "../hal/boards/dev_kit_board.c"
-        "../hal/outputs/virtual_output_driver.c"
+        "../hal/outputs/dev_kit_output_driver.c"
+        "../hal/master_valve/dev_kit_master_valve_driver.c"
     )
 else()
     list(APPEND IRRIGATION_SOURCES
