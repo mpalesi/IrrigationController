@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "esp_http_server.h"
 #include "esp_log.h"
@@ -28,7 +29,9 @@ static const char PAGE[] =
     "function card(p){let c=document.createElement('div');c.className='program';c.dataset.index=p.index;let n=document.createElement('input');n.className='name';n.maxLength=31;n.placeholder='Program name';n.value=p.name;let t=document.createElement('div');t.className='total';let ss=document.createElement('div');ss.className='steps';let a=document.createElement('button');a.textContent='Add Zone';a.onclick=()=>{step(c,{zone_id:config.zones[0].id,duration_ms:30000});total(c)};let v=document.createElement('button');v.textContent='Save';v.onclick=()=>save(c);let x=document.createElement('button');x.textContent='Delete';x.onclick=()=>go('/program/delete?index='+c.dataset.index);let q=document.createElement('button');q.textContent='Start';q.onclick=()=>go('/program/start?index='+c.dataset.index);c.append(n,t,ss,a,v,x,q);programs.append(c);p.steps.forEach(s=>step(c,s));total(c)}"
     "function addProgram(){card({index:'new',name:'',steps:[]})}"
     "function save(c){let s=[...c.querySelectorAll('.step')].map(r=>[r.querySelector('.zone').value,r.querySelector('.seconds').value]);let q=new URLSearchParams({index:c.dataset.index,name:c.querySelector('.name').value,zones:s.map(x=>x[0]),durations:s.map(x=>x[1])});go('/program/save?'+q)}"
-    "async function load(){let j=await (await fetch('/status')).json();statusOutput.textContent=JSON.stringify(j,null,2);zones.innerHTML=j.zones.map(z=>`${z.id} <button onclick=\"go('/zone/open?id=${z.id}')\">Open</button><button onclick=\"go('/zone/close?id=${z.id}')\">Close</button><br>`).join('')}"
+    "const systemStates=['BOOT','READY','RUNNING','MANUAL','OTA','MAINTENANCE','ERROR'],masterStates=['CLOSED','OPENING','OPEN','CLOSING','FAULT'],programStates=['IDLE','WAITING_MASTER','RUNNING_ZONE','WAITING_POST_PROGRAM_DELAY','COMPLETED','ABORTED','FAULT'],zoneStates=['DISABLED','IDLE','OPENING','OPEN','CLOSING','FAULT'];"
+    "function stateName(states,value){return states[value]||String(value)}"
+    "async function load(){let j=await (await fetch('/status')).json();statusOutput.textContent='System: '+stateName(systemStates,j.system)+'\\nMaster Valve: '+stateName(masterStates,j.master)+'\\nProgram: '+stateName(programStates,j.program)+'\\nClock synchronized: '+(j.clock_valid?'Yes':'No')+'\\nDay: '+j.day+'\\nTime: '+j.time+'\\n'+j.zones.map(z=>z.id.replace(/^zone-/,'Zone ')+': '+stateName(zoneStates,z.state)).join('\\n');zones.innerHTML=j.zones.map(z=>`${z.id} <button onclick=\"go('/zone/open?id=${z.id}')\">Open</button><button onclick=\"go('/zone/close?id=${z.id}')\">Close</button><br>`).join('')}"
     "async function loadPrograms(){config=await (await fetch('/programs')).json();programs.innerHTML='';config.programs.forEach(card)}"
     "async function initialize(){await load();await loadPrograms()}initialize();setInterval(load,2000)</script>";
 
@@ -36,6 +39,9 @@ static httpd_handle_t server;
 static const char *TAG = "dev_kit_web";
 static char status_response[1536];
 static char programs_response[PROGRAM_RESPONSE_SIZE];
+static const char *const WEEKDAY_NAMES[] = {
+    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+};
 
 typedef struct {
     char query[QUERY_SIZE];
@@ -76,7 +82,36 @@ static bool parse_steps(const DevKitWebContext *c, const char *zones_text, const
 }
 
 static esp_err_t page_handler(httpd_req_t *r) { httpd_resp_set_type(r, "text/html"); return httpd_resp_send(r, PAGE, HTTPD_RESP_USE_STRLEN); }
-static esp_err_t status_handler(httpd_req_t *r) { DevKitWebContext *c = r->user_ctx; RuntimeState s = state_store_snapshot(c->state_store); size_t used = (size_t)snprintf(status_response, sizeof(status_response), "{\"system\":%d,\"master\":%d,\"program\":%d,\"zones\":[", s.system_state, s.master_valve.state, s.program.state); for (size_t i = 0; i < s.zone_count && used < sizeof(status_response); ++i) used += (size_t)snprintf(status_response + used, sizeof(status_response) - used, "%s{\"id\":\"%s\",\"state\":%d}", i ? "," : "", s.zones[i].zone_id, s.zones[i].state); snprintf(status_response + used, sizeof(status_response) - used, "]}"); httpd_resp_set_type(r, "application/json"); return httpd_resp_sendstr(r, status_response); }
+static esp_err_t status_handler(httpd_req_t *r)
+{
+    DevKitWebContext *c = r->user_ctx;
+    RuntimeState s = state_store_snapshot(c->state_store);
+    time_t now;
+    struct tm local_time;
+    char iso_week[3] = {0};
+    char time_text[9] = "--:--:--";
+    const char *day = "Unknown";
+    time(&now);
+    localtime_r(&now, &local_time);
+    const bool clock_valid = now >= 1700000000 && strftime(iso_week, sizeof(iso_week), "%V", &local_time) != 0U;
+    if (clock_valid) {
+        day = WEEKDAY_NAMES[local_time.tm_wday];
+        (void)strftime(time_text, sizeof(time_text), "%H:%M:%S", &local_time);
+    }
+    size_t used = (size_t)snprintf(status_response, sizeof(status_response),
+                                   "{\"system\":%d,\"master\":%d,\"program\":%d,\"zones\":[",
+                                   s.system_state, s.master_valve.state, s.program.state);
+    for (size_t i = 0U; i < s.zone_count && used < sizeof(status_response); ++i) {
+        used += (size_t)snprintf(status_response + used, sizeof(status_response) - used,
+                                 "%s{\"id\":\"%s\",\"state\":%d}", i ? "," : "",
+                                 s.zones[i].zone_id, s.zones[i].state);
+    }
+    (void)snprintf(status_response + used, sizeof(status_response) - used,
+                   "],\"clock_valid\":%s,\"day\":\"%s\",\"time\":\"%s\"}",
+                   clock_valid ? "true" : "false", day, time_text);
+    httpd_resp_set_type(r, "application/json");
+    return httpd_resp_sendstr(r, status_response);
+}
 static esp_err_t programs_handler(httpd_req_t *r) { DevKitWebContext *c = r->user_ctx; size_t used = (size_t)snprintf(programs_response, sizeof(programs_response), "{\"zones\":["); for (size_t i = 0; i < c->zone_count; ++i) used += (size_t)snprintf(programs_response + used, sizeof(programs_response) - used, "%s{\"id\":\"%s\"}", i ? "," : "", c->zones[i].id); used += (size_t)snprintf(programs_response + used, sizeof(programs_response) - used, "],\"programs\":["); bool first = true; for (size_t i = 0; i < DEV_KIT_WEB_MAX_PROGRAMS; ++i) { DevKitProgramConfiguration *d = c->program_configuration; if (!d->in_use[i]) continue; Program *p = &d->programs[i]; used += (size_t)snprintf(programs_response + used, sizeof(programs_response) - used, "%s{\"index\":%u,\"name\":\"%s\",\"total_duration_ms\":%u,\"steps\":[", first ? "" : ",", (unsigned)i, p->id, (unsigned)total_ms(p)); for (size_t j = 0; j < p->step_count; ++j) used += (size_t)snprintf(programs_response + used, sizeof(programs_response) - used, "%s{\"zone_id\":\"%s\",\"duration_ms\":%u}", j ? "," : "", p->steps[j].zone_id, (unsigned)p->steps[j].duration_ms); used += (size_t)snprintf(programs_response + used, sizeof(programs_response) - used, "]}"); first = false; } snprintf(programs_response + used, sizeof(programs_response) - used, "]}"); httpd_resp_set_type(r, "application/json"); return httpd_resp_sendstr(r, programs_response); }
 
 static esp_err_t zone_handler(httpd_req_t *r) { DevKitWebContext *c = r->user_ctx; char id[32]; if (!query_value(r, "id", id, sizeof(id))) return send_result(r, IRRIGATION_RESULT_REJECTED); return send_result(r, strncmp(r->uri, "/zone/open", strlen("/zone/open")) == 0 ? zone_service_open(c->zone_service, id, 0) : zone_service_close(c->zone_service, id)); }
