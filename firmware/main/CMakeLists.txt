@@ -1,6 +1,7 @@
 set(IRRIGATION_SOURCES
     "system_ready.c"
     "../interfaces/http/dev_kit_web.c"
+    "../interfaces/http/dev_kit_zone_configuration.c"
     "../app/state/state_store.c"
     "../app/clock.c"
     "../app/commands/command_bus.c"

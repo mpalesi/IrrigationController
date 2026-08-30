@@ -18,6 +18,7 @@ add_executable(unit_tests
     ../firmware/domain/master_valve/master_valve_service.c
     ../firmware/domain/programs/program_service.c
     ../firmware/domain/scheduler/scheduler_service.c
+    ../firmware/interfaces/http/dev_kit_zone_configuration.c
     ../firmware/infrastructure/logging/logger.c
     ../firmware/hal/outputs/output_driver.c
     ../firmware/hal/outputs/virtual_output_driver.c

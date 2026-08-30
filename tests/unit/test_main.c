@@ -15,6 +15,7 @@
 #include "domain/zones/zone.h"
 #include "domain/zones/zone_service.h"
 #include "hal/outputs/virtual_output_driver.h"
+#include "interfaces/http/dev_kit_zone_configuration.h"
 
 typedef struct {
     uint64_t now_ms;
@@ -55,6 +56,24 @@ static const Zone ZONES[] = {
     {.id = "zone-1", .output = &OUTPUT_ONE, .enabled = true, .default_duration_ms = 100U},
     {.id = "zone-2", .output = &OUTPUT_TWO, .enabled = true, .default_duration_ms = 200U},
 };
+
+static void test_dev_kit_zone_names(void)
+{
+    DevKitZoneConfiguration configuration;
+    const ProgramStep step = {.zone_id = "zone-1", .duration_ms = 100U};
+    char too_long[DEV_KIT_ZONE_NAME_SIZE + 1U];
+    memset(too_long, 'a', DEV_KIT_ZONE_NAME_SIZE);
+    too_long[DEV_KIT_ZONE_NAME_SIZE] = '\0';
+
+    dev_kit_zone_configuration_init(&configuration, 4U);
+    assert(strcmp(dev_kit_zone_configuration_name(&configuration, 0U), "Zone 1") == 0);
+    assert(strcmp(dev_kit_zone_configuration_name(&configuration, 3U), "Zone 4") == 0);
+    assert(dev_kit_zone_configuration_set_name(&configuration, 0U, "Prato") == IRRIGATION_RESULT_OK);
+    assert(strcmp(dev_kit_zone_configuration_name(&configuration, 0U), "Prato") == 0);
+    assert(strcmp(step.zone_id, "zone-1") == 0);
+    assert(dev_kit_zone_configuration_set_name(&configuration, 0U, "") == IRRIGATION_RESULT_REJECTED);
+    assert(dev_kit_zone_configuration_set_name(&configuration, 0U, too_long) == IRRIGATION_RESULT_REJECTED);
+}
 
 static uint64_t fake_now_ms(void *context)
 {
@@ -958,6 +977,7 @@ static void test_scheduler_handles_midnight_rollover(void)
 
 int main(void)
 {
+    test_dev_kit_zone_names();
     test_open_close_and_authority();
     test_invalid_and_forbidden_transitions();
     test_failed_on_safe_close_and_start_lockout();

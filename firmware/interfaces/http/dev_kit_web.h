@@ -9,6 +9,7 @@
 #include "domain/scheduler/scheduler_service.h"
 #include "domain/zones/zone.h"
 #include "domain/zones/zone_service.h"
+#include "interfaces/http/dev_kit_zone_configuration.h"
 
 #define DEV_KIT_WEB_MAX_PROGRAMS 4U
 #define DEV_KIT_WEB_MAX_PROGRAM_STEPS 8U
@@ -31,6 +32,7 @@ typedef struct {
     SchedulerService *scheduler_service;
     const Zone *zones;
     size_t zone_count;
+    DevKitZoneConfiguration *zone_configuration;
     DevKitProgramConfiguration *program_configuration;
 } DevKitWebContext;
 

@@ -34,6 +34,7 @@ static ProgramService program_service;
 static SchedulerService scheduler_service;
 static DevKitWebContext web_context;
 static DevKitProgramConfiguration program_configuration;
+static DevKitZoneConfiguration zone_configuration;
 
 static const Output DEV_OUTPUTS[] = {
     {.id = "dev-output-1", .driver_output_index = 0U},
@@ -195,6 +196,7 @@ void app_main(void)
 
     Clock clock = {.now_ms = esp_clock_now_ms, .context = NULL};
     initialize_dev_program_configuration();
+    dev_kit_zone_configuration_init(&zone_configuration, sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0]));
     if (state_store_configure_zones(&state_store, DEV_ZONES,
                                     sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0])) != IRRIGATION_RESULT_OK) {
         ESP_LOGE(TAG, "unable to configure DEV_KIT zones");
@@ -213,6 +215,7 @@ void app_main(void)
         .master_valve_service = &master_valve_service, .program_service = &program_service,
         .scheduler_service = &scheduler_service, .zones = DEV_ZONES,
         .zone_count = sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0]),
+        .zone_configuration = &zone_configuration,
         .program_configuration = &program_configuration,
     };
     (void)xTaskCreate(scheduler_task, "scheduler", 6144U, &scheduler_service, 4U, NULL);
