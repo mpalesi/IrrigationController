@@ -126,6 +126,10 @@ IrrigationResult state_store_set_program_running_zone(StateStore *store, size_t 
 IrrigationResult state_store_set_program_waiting_post_delay(StateStore *store, uint64_t started_at_ms);
 IrrigationResult state_store_set_program_terminal(StateStore *store, ProgramState state);
 IrrigationResult state_store_configure_scheduler(StateStore *store, size_t entry_count);
+IrrigationResult state_store_get_schedule_occurrence(const StateStore *store, size_t entry_index,
+                                                      uint64_t *occurrence,
+                                                      ScheduleOccurrenceStatus *status);
+IrrigationResult state_store_reset_schedule_occurrence(StateStore *store, size_t entry_index);
 IrrigationResult state_store_record_schedule_occurrence(StateStore *store, size_t entry_index,
                                                          uint64_t occurrence,
                                                          ScheduleOccurrenceStatus status);

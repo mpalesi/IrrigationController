@@ -312,10 +312,29 @@ IrrigationResult state_store_configure_scheduler(StateStore *store, size_t entry
         return IRRIGATION_RESULT_REJECTED;
     }
     store->current.scheduler.entry_count = entry_count;
-    for (size_t index = 0U; index < IRRIGATION_MAX_SCHEDULES; ++index) {
-        store->current.scheduler.last_handled_occurrence[index] = SCHEDULE_OCCURRENCE_UNHANDLED;
-        store->current.scheduler.last_occurrence_status[index] = SCHEDULE_OCCURRENCE_NONE;
+    return IRRIGATION_RESULT_OK;
+}
+
+IrrigationResult state_store_get_schedule_occurrence(const StateStore *store, size_t entry_index,
+                                                      uint64_t *occurrence,
+                                                      ScheduleOccurrenceStatus *status)
+{
+    if (store == NULL || occurrence == NULL || status == NULL ||
+        entry_index >= store->current.scheduler.entry_count) {
+        return IRRIGATION_RESULT_INVALID_STATE;
     }
+    *occurrence = store->current.scheduler.last_handled_occurrence[entry_index];
+    *status = store->current.scheduler.last_occurrence_status[entry_index];
+    return IRRIGATION_RESULT_OK;
+}
+
+IrrigationResult state_store_reset_schedule_occurrence(StateStore *store, size_t entry_index)
+{
+    if (store == NULL || entry_index >= store->current.scheduler.entry_count) {
+        return IRRIGATION_RESULT_INVALID_STATE;
+    }
+    store->current.scheduler.last_handled_occurrence[entry_index] = SCHEDULE_OCCURRENCE_UNHANDLED;
+    store->current.scheduler.last_occurrence_status[entry_index] = SCHEDULE_OCCURRENCE_NONE;
     return IRRIGATION_RESULT_OK;
 }
 

@@ -748,6 +748,63 @@ static void complete_zero_duration_program(ProgramService *service)
     assert(program_service_state(service) == PROGRAM_STATE_COMPLETED);
 }
 
+static void test_scheduler_does_not_catch_up_or_replay_unchanged_entries(void)
+{
+    const ProgramStep steps[] = {{.zone_id = "zone-1", .duration_ms = 0U}};
+    const Program program = {.id = "program", .steps = steps, .step_count = 1U};
+    const SchedulerEntry entry_a[] = {{.id = "schedule-a", .enabled = true,
+                                        .weekday_mask = SCHEDULER_WEEKDAY_MASK(2U), .hour = 6U,
+                                        .minute = 0U, .program = &program}};
+    const SchedulerEntry entries_ab[] = {
+        {.id = "schedule-a", .enabled = true, .weekday_mask = SCHEDULER_WEEKDAY_MASK(2U), .hour = 6U,
+         .minute = 0U, .program = &program},
+        {.id = "schedule-b", .enabled = false, .weekday_mask = SCHEDULER_WEEKDAY_MASK(3U), .hour = 7U,
+         .minute = 0U, .program = &program},
+    };
+    StateStore store;
+    FakeClock clock = {0};
+    EventRecorder recorder = {0};
+    EventBus bus;
+    VirtualOutputDriver zone_driver;
+    FakeMasterValveDriver master_driver;
+    MasterValveService master_service;
+    ProgramService program_service;
+    SchedulerService scheduler;
+    virtual_output_driver_init(&zone_driver, (Logger){0});
+    fake_master_valve_driver_init(&master_driver);
+    initialize_store_with_closed_master_valve(&store);
+    master_valve_service_init(&master_service, &store, &master_driver.base,
+                              (Clock){.now_ms = fake_now_ms, .context = &clock},
+                              (MasterValveConfiguration){0});
+    ZoneService zone_service = make_service(&store, &zone_driver.base, &recorder, &clock, &bus);
+    program_service_init(&program_service, &store, &master_service, &zone_service,
+                         (Clock){.now_ms = fake_now_ms, .context = &clock});
+    scheduler_service_init(&scheduler, &store, &program_service);
+
+    assert(scheduler_service_configure(&scheduler, entry_a, 1U) == IRRIGATION_RESULT_OK);
+    assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 1U, .weekday = 2U,
+                                                                  .hour = 16U, .minute = 5U}) ==
+           IRRIGATION_RESULT_OK);
+    assert(master_driver.open_calls == 0U);
+    assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 2U, .weekday = 2U,
+                                                                  .hour = 6U}) == IRRIGATION_RESULT_OK);
+    assert(master_driver.open_calls == 1U);
+    complete_zero_duration_program(&program_service);
+
+    assert(scheduler_service_configure(&scheduler, entries_ab, 2U) == IRRIGATION_RESULT_OK);
+    assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 2U, .weekday = 2U,
+                                                                  .hour = 6U}) == IRRIGATION_RESULT_OK);
+    assert(master_driver.open_calls == 1U);
+    assert(scheduler_service_set_enabled(&scheduler, 1U, true) == IRRIGATION_RESULT_OK);
+    assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 2U, .weekday = 2U,
+                                                                  .hour = 6U}) == IRRIGATION_RESULT_OK);
+    assert(master_driver.open_calls == 1U);
+    assert(scheduler_service_configure(&scheduler, entry_a, 1U) == IRRIGATION_RESULT_OK);
+    assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 2U, .weekday = 2U,
+                                                                  .hour = 6U}) == IRRIGATION_RESULT_OK);
+    assert(master_driver.open_calls == 1U);
+}
+
 static void test_scheduler_recurs_without_duplicate_starts(void)
 {
     const ProgramStep steps_a[] = {{.zone_id = "zone-1", .duration_ms = 0U}};
@@ -916,6 +973,7 @@ int main(void)
     test_program_zero_durations_complete_deterministically();
     test_program_faults_on_master_or_zone_failures();
     test_program_faults_on_master_close_failure_and_aborts_safely();
+    test_scheduler_does_not_catch_up_or_replay_unchanged_entries();
     test_scheduler_recurs_without_duplicate_starts();
     test_scheduler_skips_busy_and_rejected_occurrences();
     test_scheduler_handles_midnight_rollover();
