@@ -44,6 +44,7 @@ typedef struct {
 typedef struct {
     ConfigurationRepositoryStorage storage;
     uint8_t slot_buffers[2][CONFIGURATION_REPOSITORY_MAX_BLOB_SIZE];
+    IrrigationConfiguration slot_configurations[2];
 } ConfigurationRepository;
 
 void configuration_repository_init(ConfigurationRepository *repository,

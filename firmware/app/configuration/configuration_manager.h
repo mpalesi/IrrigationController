@@ -4,12 +4,23 @@
 
 #include "app/configuration/irrigation_configuration.h"
 #include "domain/scheduler/scheduler_service.h"
+#include "infrastructure/persistence/configuration_repository.h"
+
+typedef enum {
+    CONFIGURATION_MANAGER_BOOT_LOADED = 0,
+    CONFIGURATION_MANAGER_BOOT_DEFAULTS_PERSISTED,
+    CONFIGURATION_MANAGER_BOOT_DEFAULTS_CORRUPT,
+    CONFIGURATION_MANAGER_BOOT_DEFAULTS_INCOMPATIBLE,
+    CONFIGURATION_MANAGER_BOOT_DEFAULTS_STORAGE_ERROR,
+} ConfigurationManagerBootResult;
 
 typedef struct {
     IrrigationConfiguration configuration;
     IrrigationConfiguration candidate;
     const Zone *board_zones;
     size_t board_zone_count;
+    ConfigurationRepository *repository;
+    bool persistence_required;
     Program runtime_programs[IRRIGATION_MAX_PROGRAMS];
     ProgramStep runtime_program_steps[IRRIGATION_MAX_PROGRAMS][IRRIGATION_MAX_PROGRAM_STEPS];
     char runtime_program_ids[IRRIGATION_MAX_PROGRAMS][IRRIGATION_CONFIGURATION_ID_SIZE];
@@ -25,6 +36,11 @@ typedef struct {
 IrrigationResult configuration_manager_init_dev_kit_defaults(ConfigurationManager *manager,
                                                               const Zone *board_zones,
                                                               size_t board_zone_count);
+void configuration_manager_set_repository(ConfigurationManager *manager,
+                                          ConfigurationRepository *repository,
+                                          bool persistence_required);
+ConfigurationManagerBootResult configuration_manager_load_or_persist_defaults(
+    ConfigurationManager *manager, ConfigurationRepository *repository);
 const IrrigationConfiguration *configuration_manager_get(const ConfigurationManager *manager);
 IrrigationResult configuration_manager_validate_candidate(const ConfigurationManager *manager,
                                                           const IrrigationConfiguration *candidate);

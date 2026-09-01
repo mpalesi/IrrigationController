@@ -26,6 +26,7 @@
 #include "hal/boards/board_composition.h"
 #include "hal/outputs/output_driver.h"
 #include "interfaces/http/dev_kit_web.h"
+#include "infrastructure/persistence/configuration_repository.h"
 
 static const char *TAG = "irrigation_controller";
 static StateStore state_store;
@@ -36,6 +37,7 @@ static ProgramService program_service;
 static SchedulerService scheduler_service;
 static DevKitWebContext web_context;
 static ConfigurationManager configuration_manager;
+static ConfigurationRepository configuration_repository;
 
 static const Output DEV_OUTPUTS[] = {
     {.id = "dev-output-1", .driver_output_index = 0U},
@@ -153,6 +155,43 @@ static void log_event(const Event *event, void *context)
     ESP_LOGI(TAG, "event type=%d source=%s", event->type, event->source);
 }
 
+static bool initialize_configuration(void)
+{
+    if (configuration_manager_init_dev_kit_defaults(&configuration_manager, DEV_ZONES,
+                                                     sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0])) !=
+        IRRIGATION_RESULT_OK) {
+        ESP_LOGE(TAG, "unable to initialize DEV_KIT configuration defaults");
+        return false;
+    }
+    if (nvs_configuration_repository_init(&configuration_repository) != CONFIGURATION_REPOSITORY_OK) {
+        ESP_LOGE(TAG, "unable to initialize irrigation_cfg; configuration mutations are disabled");
+        configuration_manager_set_repository(&configuration_manager, NULL, true);
+        return true;
+    }
+    const ConfigurationManagerBootResult boot_result =
+        configuration_manager_load_or_persist_defaults(&configuration_manager, &configuration_repository);
+    switch (boot_result) {
+        case CONFIGURATION_MANAGER_BOOT_LOADED:
+            ESP_LOGI(TAG, "loaded persistent irrigation configuration");
+            break;
+        case CONFIGURATION_MANAGER_BOOT_DEFAULTS_PERSISTED:
+            ESP_LOGI(TAG, "irrigation_cfg is empty; persisted DEV_KIT defaults");
+            break;
+        case CONFIGURATION_MANAGER_BOOT_DEFAULTS_CORRUPT:
+            ESP_LOGW(TAG, "irrigation_cfg is corrupt; using compiled DEV_KIT defaults without overwriting it");
+            break;
+        case CONFIGURATION_MANAGER_BOOT_DEFAULTS_INCOMPATIBLE:
+            ESP_LOGW(TAG, "irrigation_cfg schema is incompatible; using compiled DEV_KIT defaults without overwriting it");
+            break;
+        case CONFIGURATION_MANAGER_BOOT_DEFAULTS_STORAGE_ERROR:
+            ESP_LOGE(TAG, "unable to load/save irrigation_cfg; using defaults and disabling configuration mutations");
+            configuration_manager_set_repository(&configuration_manager, NULL, true);
+            return true;
+    }
+    configuration_manager_set_repository(&configuration_manager, &configuration_repository, true);
+    return true;
+}
+
 void app_main(void)
 {
     state_store_init(&state_store);
@@ -179,10 +218,7 @@ void app_main(void)
     (void)event_bus_publish(&event_bus, &ready_event);
 
     Clock clock = {.now_ms = esp_clock_now_ms, .context = NULL};
-    if (configuration_manager_init_dev_kit_defaults(&configuration_manager, DEV_ZONES,
-                                                     sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0])) !=
-        IRRIGATION_RESULT_OK) {
-        ESP_LOGE(TAG, "unable to initialize DEV_KIT configuration defaults");
+    if (!initialize_configuration()) {
         return;
     }
     if (state_store_configure_zones(&state_store, DEV_ZONES,

@@ -439,6 +439,136 @@ static void test_configuration_repository(void)
     assert_configuration_equal(&loaded, &boundary);
 }
 
+static void initialize_configuration_manager(ConfigurationManager *manager)
+{
+    assert(configuration_manager_init_dev_kit_defaults(manager, CONFIGURATION_ZONES,
+                                                       configuration_zone_count()) == IRRIGATION_RESULT_OK);
+}
+
+static void reboot_configuration_manager(ConfigurationManager *manager, ConfigurationRepository *repository)
+{
+    initialize_configuration_manager(manager);
+    assert(configuration_manager_load_or_persist_defaults(manager, repository) ==
+           CONFIGURATION_MANAGER_BOOT_LOADED);
+    configuration_manager_set_repository(manager, repository, true);
+}
+
+static void test_configuration_manager_persistence(void)
+{
+    const IrrigationProgramStepConfiguration steps[] = {
+        {.zone_id = "zone-3", .duration_ms = 3000U},
+        {.zone_id = "zone-4", .duration_ms = 4000U},
+    };
+    ConfigurationRepository repository;
+    MockConfigurationStorage storage;
+    ConfigurationManager manager;
+    ConfigurationManager restarted;
+    initialize_mock_repository(&repository, &storage);
+    initialize_configuration_manager(&manager);
+
+    assert(configuration_manager_load_or_persist_defaults(&manager, &repository) ==
+           CONFIGURATION_MANAGER_BOOT_DEFAULTS_PERSISTED);
+    assert(storage.lengths[0] != 0U);
+    configuration_manager_set_repository(&manager, &repository, true);
+
+    assert(configuration_manager_rename_zone(&manager, "zone-1", "Persisted lawn") ==
+           IRRIGATION_RESULT_OK);
+    reboot_configuration_manager(&restarted, &repository);
+    assert(strcmp(configuration_manager_zone_name(&restarted, "zone-1"), "Persisted lawn") == 0);
+
+    size_t program_index;
+    assert(configuration_manager_create_program(&restarted, "Persistent evening", steps, 2U,
+                                                &program_index) == IRRIGATION_RESULT_OK);
+    assert(strcmp(configuration_manager_get(&restarted)->programs[program_index].program_id, "program-1") == 0);
+    reboot_configuration_manager(&manager, &repository);
+    assert(manager.configuration.program_count == 2U);
+    assert(strcmp(manager.configuration.programs[1].display_name, "Persistent evening") == 0);
+    assert(manager.configuration.next_program_id == 2U);
+    assert(configuration_manager_update_program(&manager, 1U, "Persistent evening updated", steps, 2U) ==
+           IRRIGATION_RESULT_OK);
+    reboot_configuration_manager(&restarted, &repository);
+    assert(strcmp(restarted.configuration.programs[1].program_id, "program-1") == 0);
+    assert(strcmp(restarted.configuration.programs[1].display_name, "Persistent evening updated") == 0);
+
+    size_t schedule_index;
+    assert(configuration_manager_create_schedule(&restarted,
+                                                 SCHEDULER_WEEKDAY_MASK(1U) | SCHEDULER_WEEKDAY_MASK(3U),
+                                                 18U, 15U, "program-1", &schedule_index) == IRRIGATION_RESULT_OK);
+    assert(strcmp(restarted.configuration.schedules[schedule_index].schedule_id, "schedule-1") == 0);
+    reboot_configuration_manager(&manager, &repository);
+    assert(manager.configuration.schedule_count == 2U);
+    assert(manager.configuration.next_schedule_id == 2U);
+    assert(configuration_manager_update_schedule(&manager, 1U, SCHEDULER_WEEKDAY_MASK(5U), 19U, 30U,
+                                                 "program-1") == IRRIGATION_RESULT_OK);
+    assert(configuration_manager_set_schedule_enabled(&manager, 1U, true) == IRRIGATION_RESULT_OK);
+    reboot_configuration_manager(&restarted, &repository);
+    assert(strcmp(restarted.configuration.schedules[1].schedule_id, "schedule-1") == 0);
+    assert(restarted.configuration.schedules[1].enabled);
+    assert(restarted.configuration.schedules[1].weekday_mask == SCHEDULER_WEEKDAY_MASK(5U));
+    assert(restarted.configuration.schedules[1].hour == 19U && restarted.configuration.schedules[1].minute == 30U);
+    assert(configuration_manager_set_schedule_enabled(&restarted, 1U, false) == IRRIGATION_RESULT_OK);
+    reboot_configuration_manager(&manager, &repository);
+    assert(!manager.configuration.schedules[1].enabled);
+    assert(configuration_manager_delete_schedule(&manager, 1U) == IRRIGATION_RESULT_OK);
+    assert(configuration_manager_delete_program(&manager, 1U) == IRRIGATION_RESULT_OK);
+    reboot_configuration_manager(&restarted, &repository);
+    assert(restarted.configuration.program_count == 1U && restarted.configuration.schedule_count == 1U);
+    assert(restarted.configuration.next_program_id == 2U && restarted.configuration.next_schedule_id == 2U);
+    assert(configuration_manager_create_program(&restarted, "No reused ID", steps, 2U, &program_index) ==
+           IRRIGATION_RESULT_OK);
+    assert(strcmp(restarted.configuration.programs[program_index].program_id, "program-2") == 0);
+
+    const IrrigationConfiguration before_failed_save = *configuration_manager_get(&restarted);
+    storage.fail_write = true;
+    assert(configuration_manager_rename_zone(&restarted, "zone-2", "Should not apply") ==
+           IRRIGATION_RESULT_INTERNAL_ERROR);
+    assert_configuration_equal(configuration_manager_get(&restarted), &before_failed_save);
+    storage.fail_write = false;
+    storage.fail_commit = true;
+    assert(configuration_manager_rename_zone(&restarted, "zone-2", "Still should not apply") ==
+           IRRIGATION_RESULT_INTERNAL_ERROR);
+    assert_configuration_equal(configuration_manager_get(&restarted), &before_failed_save);
+}
+
+static void test_configuration_manager_persistence_boot_fallbacks(void)
+{
+    ConfigurationRepository repository;
+    MockConfigurationStorage storage;
+    ConfigurationManager manager;
+    IrrigationConfiguration persisted = make_repository_configuration();
+    initialize_mock_repository(&repository, &storage);
+    assert(configuration_repository_save(&repository, &persisted, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    initialize_configuration_manager(&manager);
+    assert(configuration_manager_load_or_persist_defaults(&manager, &repository) ==
+           CONFIGURATION_MANAGER_BOOT_LOADED);
+    assert_configuration_equal(configuration_manager_get(&manager), &persisted);
+
+    storage.blobs[0][CONFIGURATION_REPOSITORY_HEADER_SIZE] ^= 1U;
+    const size_t corrupted_length = storage.lengths[0];
+    uint8_t corrupted_blob[CONFIGURATION_REPOSITORY_MAX_BLOB_SIZE];
+    memcpy(corrupted_blob, storage.blobs[0], corrupted_length);
+    initialize_configuration_manager(&manager);
+    assert(configuration_manager_load_or_persist_defaults(&manager, &repository) ==
+           CONFIGURATION_MANAGER_BOOT_DEFAULTS_CORRUPT);
+    assert(strcmp(configuration_manager_zone_name(&manager, "zone-1"), "Zone 1") == 0);
+    assert(storage.lengths[0] == corrupted_length);
+    assert(memcmp(storage.blobs[0], corrupted_blob, corrupted_length) == 0);
+
+    initialize_mock_repository(&repository, &storage);
+    assert(configuration_repository_encode(&persisted, 1U, storage.blobs[0], sizeof(storage.blobs[0]),
+                                           &storage.lengths[0]) == CONFIGURATION_REPOSITORY_OK);
+    storage.blobs[0][4] = 2U;
+    const size_t incompatible_length = storage.lengths[0];
+    uint8_t incompatible_blob[CONFIGURATION_REPOSITORY_MAX_BLOB_SIZE];
+    memcpy(incompatible_blob, storage.blobs[0], incompatible_length);
+    initialize_configuration_manager(&manager);
+    assert(configuration_manager_load_or_persist_defaults(&manager, &repository) ==
+           CONFIGURATION_MANAGER_BOOT_DEFAULTS_INCOMPATIBLE);
+    assert(storage.lengths[0] == incompatible_length);
+    assert(memcmp(storage.blobs[0], incompatible_blob, incompatible_length) == 0);
+}
+
 static void test_configuration_manager_mutations(void)
 {
     ConfigurationManager manager;
@@ -1452,6 +1582,8 @@ int main(void)
 {
     test_irrigation_configuration_validation();
     test_configuration_repository();
+    test_configuration_manager_persistence();
+    test_configuration_manager_persistence_boot_fallbacks();
     test_configuration_manager_mutations();
     test_dev_kit_zone_names();
     test_configuration_manager_preserves_scheduler_occurrence();

@@ -89,11 +89,21 @@ static void rebuild_runtime_views(ConfigurationManager *manager)
 static IrrigationResult replace_candidate(ConfigurationManager *manager)
 {
     IrrigationResult result = configuration_manager_validate_candidate(manager, &manager->candidate);
-    if (result == IRRIGATION_RESULT_OK) {
-        manager->configuration = manager->candidate;
-        rebuild_runtime_views(manager);
+    if (result != IRRIGATION_RESULT_OK) {
+        return result;
     }
-    return result;
+    if (manager->repository == NULL) {
+        if (manager->persistence_required) {
+            return IRRIGATION_RESULT_INTERNAL_ERROR;
+        }
+    } else if (configuration_repository_save(manager->repository, &manager->candidate,
+                                             manager->board_zones, manager->board_zone_count) !=
+               CONFIGURATION_REPOSITORY_OK) {
+        return IRRIGATION_RESULT_INTERNAL_ERROR;
+    }
+    manager->configuration = manager->candidate;
+    rebuild_runtime_views(manager);
+    return IRRIGATION_RESULT_OK;
 }
 
 IrrigationResult configuration_manager_init_dev_kit_defaults(ConfigurationManager *manager, const Zone *board_zones, size_t board_zone_count)
@@ -129,6 +139,42 @@ IrrigationResult configuration_manager_init_dev_kit_defaults(ConfigurationManage
 }
 
 const IrrigationConfiguration *configuration_manager_get(const ConfigurationManager *manager) { return manager == NULL ? NULL : &manager->configuration; }
+
+void configuration_manager_set_repository(ConfigurationManager *manager,
+                                          ConfigurationRepository *repository,
+                                          bool persistence_required)
+{
+    if (manager == NULL) return;
+    manager->repository = repository;
+    manager->persistence_required = persistence_required;
+}
+
+ConfigurationManagerBootResult configuration_manager_load_or_persist_defaults(
+    ConfigurationManager *manager, ConfigurationRepository *repository)
+{
+    if (manager == NULL || repository == NULL) {
+        return CONFIGURATION_MANAGER_BOOT_DEFAULTS_STORAGE_ERROR;
+    }
+    uint32_t generation;
+    const ConfigurationRepositoryResult result = configuration_repository_load(
+        repository, &manager->candidate, &generation, manager->board_zones, manager->board_zone_count);
+    if (result == CONFIGURATION_REPOSITORY_OK) {
+        manager->configuration = manager->candidate;
+        rebuild_runtime_views(manager);
+        return CONFIGURATION_MANAGER_BOOT_LOADED;
+    }
+    if (result == CONFIGURATION_REPOSITORY_NOT_FOUND) {
+        return configuration_repository_save(repository, &manager->configuration, manager->board_zones,
+                                             manager->board_zone_count) == CONFIGURATION_REPOSITORY_OK
+                   ? CONFIGURATION_MANAGER_BOOT_DEFAULTS_PERSISTED
+                   : CONFIGURATION_MANAGER_BOOT_DEFAULTS_STORAGE_ERROR;
+    }
+    return result == CONFIGURATION_REPOSITORY_INCOMPATIBLE
+               ? CONFIGURATION_MANAGER_BOOT_DEFAULTS_INCOMPATIBLE
+               : (result == CONFIGURATION_REPOSITORY_STORAGE_ERROR
+                      ? CONFIGURATION_MANAGER_BOOT_DEFAULTS_STORAGE_ERROR
+                      : CONFIGURATION_MANAGER_BOOT_DEFAULTS_CORRUPT);
+}
 
 IrrigationResult configuration_manager_validate_candidate(const ConfigurationManager *manager, const IrrigationConfiguration *candidate)
 {
