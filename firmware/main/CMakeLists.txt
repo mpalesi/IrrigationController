@@ -4,6 +4,8 @@ set(IRRIGATION_SOURCES
     "../interfaces/http/dev_kit_zone_configuration.c"
     "../app/configuration/configuration_manager.c"
     "../app/configuration/irrigation_configuration.c"
+    "../infrastructure/persistence/configuration_repository.c"
+    "../infrastructure/persistence/nvs_configuration_repository.c"
     "../app/state/state_store.c"
     "../app/clock.c"
     "../app/commands/command_bus.c"

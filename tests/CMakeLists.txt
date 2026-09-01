@@ -9,6 +9,7 @@ add_executable(unit_tests
     unit/test_main.c
     ../firmware/app/configuration/configuration_manager.c
     ../firmware/app/configuration/irrigation_configuration.c
+    ../firmware/infrastructure/persistence/configuration_repository.c
     ../firmware/app/state/state_store.c
     ../firmware/app/clock.c
     ../firmware/app/commands/command_bus.c

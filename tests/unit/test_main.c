@@ -17,6 +17,7 @@
 #include "domain/zones/zone_service.h"
 #include "hal/outputs/virtual_output_driver.h"
 #include "interfaces/http/dev_kit_zone_configuration.h"
+#include "infrastructure/persistence/configuration_repository.h"
 
 typedef struct {
     uint64_t now_ms;
@@ -64,6 +65,81 @@ static const Zone CONFIGURATION_ZONES[] = {
     {.id = "zone-3", .output = &OUTPUT_ONE, .enabled = true, .default_duration_ms = 100U},
     {.id = "zone-4", .output = &OUTPUT_TWO, .enabled = true, .default_duration_ms = 200U},
 };
+
+typedef struct {
+    uint8_t blobs[2][CONFIGURATION_REPOSITORY_MAX_BLOB_SIZE];
+    size_t lengths[2];
+    uint8_t pending_blobs[2][CONFIGURATION_REPOSITORY_MAX_BLOB_SIZE];
+    size_t pending_lengths[2];
+    bool pending[2];
+    bool fail_write;
+    bool fail_commit;
+    bool corrupt_after_commit;
+    int last_written_slot;
+} MockConfigurationStorage;
+
+static int mock_slot_for_key(const char *key)
+{
+    return strcmp(key, CONFIGURATION_REPOSITORY_SLOT_A) == 0 ? 0 :
+           (strcmp(key, CONFIGURATION_REPOSITORY_SLOT_B) == 0 ? 1 : -1);
+}
+
+static ConfigurationRepositoryResult mock_configuration_read(void *context, const char *key,
+                                                             uint8_t *buffer, size_t capacity, size_t *length)
+{
+    MockConfigurationStorage *storage = context;
+    const int slot = mock_slot_for_key(key);
+    if (slot < 0 || storage->lengths[slot] == 0U) return CONFIGURATION_REPOSITORY_NOT_FOUND;
+    if (storage->lengths[slot] > capacity) return CONFIGURATION_REPOSITORY_STORAGE_ERROR;
+    memcpy(buffer, storage->blobs[slot], storage->lengths[slot]);
+    *length = storage->lengths[slot];
+    return CONFIGURATION_REPOSITORY_OK;
+}
+
+static ConfigurationRepositoryResult mock_configuration_write(void *context, const char *key,
+                                                              const uint8_t *buffer, size_t length)
+{
+    MockConfigurationStorage *storage = context;
+    const int slot = mock_slot_for_key(key);
+    if (storage->fail_write || slot < 0 || length > sizeof(storage->pending_blobs[slot])) {
+        return CONFIGURATION_REPOSITORY_STORAGE_ERROR;
+    }
+    memcpy(storage->pending_blobs[slot], buffer, length);
+    storage->pending_lengths[slot] = length;
+    storage->pending[slot] = true;
+    storage->last_written_slot = slot;
+    return CONFIGURATION_REPOSITORY_OK;
+}
+
+static ConfigurationRepositoryResult mock_configuration_commit(void *context)
+{
+    MockConfigurationStorage *storage = context;
+    if (storage->fail_commit) {
+        memset(storage->pending, 0, sizeof(storage->pending));
+        return CONFIGURATION_REPOSITORY_STORAGE_ERROR;
+    }
+    for (size_t slot = 0U; slot < 2U; ++slot) {
+        if (!storage->pending[slot]) continue;
+        memcpy(storage->blobs[slot], storage->pending_blobs[slot], storage->pending_lengths[slot]);
+        storage->lengths[slot] = storage->pending_lengths[slot];
+        storage->pending[slot] = false;
+        if (storage->corrupt_after_commit) {
+            storage->blobs[slot][CONFIGURATION_REPOSITORY_HEADER_SIZE] ^= 1U;
+        }
+    }
+    return CONFIGURATION_REPOSITORY_OK;
+}
+
+static void initialize_mock_repository(ConfigurationRepository *repository,
+                                       MockConfigurationStorage *storage)
+{
+    *storage = (MockConfigurationStorage){0};
+    storage->last_written_slot = -1;
+    configuration_repository_init(repository, (ConfigurationRepositoryStorage){
+        .context = storage, .read = mock_configuration_read, .write = mock_configuration_write,
+        .commit = mock_configuration_commit,
+    });
+}
 
 static void test_irrigation_configuration_validation(void)
 {
@@ -125,6 +201,242 @@ static void test_irrigation_configuration_validation(void)
     candidate = *defaults;
     candidate.schedule_count = IRRIGATION_MAX_SCHEDULES + 1U;
     assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+}
+
+static size_t configuration_zone_count(void)
+{
+    return sizeof(CONFIGURATION_ZONES) / sizeof(CONFIGURATION_ZONES[0]);
+}
+
+static void assert_configuration_equal(const IrrigationConfiguration *actual,
+                                       const IrrigationConfiguration *expected)
+{
+    assert(actual->schema_version == expected->schema_version);
+    assert(actual->zone_count == expected->zone_count);
+    assert(actual->program_count == expected->program_count);
+    assert(actual->schedule_count == expected->schedule_count);
+    assert(actual->next_program_id == expected->next_program_id);
+    assert(actual->next_schedule_id == expected->next_schedule_id);
+    for (size_t index = 0U; index < expected->zone_count; ++index) {
+        assert(strcmp(actual->zones[index].zone_id, expected->zones[index].zone_id) == 0);
+        assert(strcmp(actual->zones[index].display_name, expected->zones[index].display_name) == 0);
+    }
+    for (size_t index = 0U; index < expected->program_count; ++index) {
+        const IrrigationProgramConfiguration *actual_program = &actual->programs[index];
+        const IrrigationProgramConfiguration *expected_program = &expected->programs[index];
+        assert(strcmp(actual_program->program_id, expected_program->program_id) == 0);
+        assert(strcmp(actual_program->display_name, expected_program->display_name) == 0);
+        assert(actual_program->step_count == expected_program->step_count);
+        for (size_t step = 0U; step < expected_program->step_count; ++step) {
+            assert(strcmp(actual_program->steps[step].zone_id,
+                          expected_program->steps[step].zone_id) == 0);
+            assert(actual_program->steps[step].duration_ms ==
+                   expected_program->steps[step].duration_ms);
+        }
+    }
+    for (size_t index = 0U; index < expected->schedule_count; ++index) {
+        const IrrigationScheduleConfiguration *actual_schedule = &actual->schedules[index];
+        const IrrigationScheduleConfiguration *expected_schedule = &expected->schedules[index];
+        assert(strcmp(actual_schedule->schedule_id, expected_schedule->schedule_id) == 0);
+        assert(actual_schedule->enabled == expected_schedule->enabled);
+        assert(actual_schedule->weekday_mask == expected_schedule->weekday_mask);
+        assert(actual_schedule->hour == expected_schedule->hour);
+        assert(actual_schedule->minute == expected_schedule->minute);
+        assert(strcmp(actual_schedule->program_id, expected_schedule->program_id) == 0);
+    }
+}
+
+static IrrigationConfiguration make_repository_configuration(void)
+{
+    ConfigurationManager manager;
+    assert(configuration_manager_init_dev_kit_defaults(&manager, CONFIGURATION_ZONES,
+                                                       configuration_zone_count()) == IRRIGATION_RESULT_OK);
+    IrrigationConfiguration configuration = *configuration_manager_get(&manager);
+    (void)snprintf(configuration.zones[0].display_name, sizeof(configuration.zones[0].display_name), "%s",
+                   "Front lawn");
+    (void)snprintf(configuration.zones[1].display_name, sizeof(configuration.zones[1].display_name), "%s",
+                   "Back lawn");
+    (void)snprintf(configuration.zones[2].display_name, sizeof(configuration.zones[2].display_name), "%s",
+                   "Vegetable beds");
+    (void)snprintf(configuration.zones[3].display_name, sizeof(configuration.zones[3].display_name), "%s",
+                   "Orchard");
+    configuration.program_count = 2U;
+    configuration.programs[0] = (IrrigationProgramConfiguration){
+        .program_id = "program-morning", .display_name = "Morning garden",
+        .steps = {{.zone_id = "zone-1", .duration_ms = 11000U},
+                  {.zone_id = "zone-2", .duration_ms = 22000U}}, .step_count = 2U,
+    };
+    configuration.programs[1] = (IrrigationProgramConfiguration){
+        .program_id = "program-evening", .display_name = "Evening garden",
+        .steps = {{.zone_id = "zone-4", .duration_ms = 44000U},
+                  {.zone_id = "zone-3", .duration_ms = 33000U},
+                  {.zone_id = "zone-1", .duration_ms = 55000U}}, .step_count = 3U,
+    };
+    configuration.schedule_count = 2U;
+    configuration.schedules[0] = (IrrigationScheduleConfiguration){
+        .schedule_id = "schedule-morning", .enabled = true,
+        .weekday_mask = SCHEDULER_WEEKDAY_MASK(0U) | SCHEDULER_WEEKDAY_MASK(2U) |
+                        SCHEDULER_WEEKDAY_MASK(4U),
+        .hour = 6U, .minute = 5U, .program_id = "program-morning",
+    };
+    configuration.schedules[1] = (IrrigationScheduleConfiguration){
+        .schedule_id = "schedule-evening", .enabled = false,
+        .weekday_mask = SCHEDULER_WEEKDAY_MASK(1U) | SCHEDULER_WEEKDAY_MASK(3U) |
+                        SCHEDULER_WEEKDAY_MASK(6U),
+        .hour = 19U, .minute = 30U, .program_id = "program-evening",
+    };
+    configuration.next_program_id = 37U;
+    configuration.next_schedule_id = 41U;
+    assert(irrigation_configuration_validate(&configuration, CONFIGURATION_ZONES,
+                                             configuration_zone_count()) == IRRIGATION_RESULT_OK);
+    return configuration;
+}
+
+static void test_configuration_repository(void)
+{
+    ConfigurationRepository repository;
+    MockConfigurationStorage storage;
+    IrrigationConfiguration configuration = make_repository_configuration();
+    IrrigationConfiguration loaded;
+    uint32_t generation;
+    uint8_t blob[CONFIGURATION_REPOSITORY_MAX_BLOB_SIZE];
+    size_t blob_length;
+
+    assert(configuration_repository_encode(&configuration, 7U, blob, sizeof(blob), &blob_length) ==
+           CONFIGURATION_REPOSITORY_OK);
+    assert(configuration_repository_decode(blob, blob_length, &loaded, &generation, CONFIGURATION_ZONES,
+                                            configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 7U);
+    assert_configuration_equal(&loaded, &configuration);
+
+    initialize_mock_repository(&repository, &storage);
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_NOT_FOUND);
+    assert(configuration_repository_save(&repository, &configuration, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(storage.last_written_slot == 0);
+    assert(storage.lengths[0] != 0U && storage.lengths[1] == 0U);
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 1U);
+    assert_configuration_equal(&loaded, &configuration);
+
+    IrrigationConfiguration second = configuration;
+    (void)snprintf(second.zones[0].display_name, sizeof(second.zones[0].display_name), "%s", "Updated lawn");
+    assert(configuration_repository_save(&repository, &second, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(storage.last_written_slot == 1);
+    IrrigationConfiguration third = second;
+    (void)snprintf(third.programs[0].display_name, sizeof(third.programs[0].display_name), "%s", "Updated morning");
+    assert(configuration_repository_save(&repository, &third, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(storage.last_written_slot == 0);
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 3U);
+    assert_configuration_equal(&loaded, &third);
+
+    storage.blobs[0][CONFIGURATION_REPOSITORY_HEADER_SIZE] ^= 1U;
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 2U);
+    assert_configuration_equal(&loaded, &second);
+    storage.blobs[1][CONFIGURATION_REPOSITORY_HEADER_SIZE] ^= 1U;
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_CORRUPT);
+
+    assert(configuration_repository_encode(&configuration, 3U, blob, sizeof(blob), &blob_length) ==
+           CONFIGURATION_REPOSITORY_OK);
+    blob[CONFIGURATION_REPOSITORY_HEADER_SIZE] ^= 1U;
+    assert(configuration_repository_decode(blob, blob_length, &loaded, &generation, CONFIGURATION_ZONES,
+                                            configuration_zone_count()) == CONFIGURATION_REPOSITORY_CORRUPT);
+    assert(configuration_repository_encode(&configuration, 3U, blob, sizeof(blob), &blob_length) ==
+           CONFIGURATION_REPOSITORY_OK);
+    assert(configuration_repository_decode(blob, blob_length - 1U, &loaded, &generation, CONFIGURATION_ZONES,
+                                            configuration_zone_count()) == CONFIGURATION_REPOSITORY_CORRUPT);
+    blob[0] ^= 1U;
+    assert(configuration_repository_decode(blob, blob_length, &loaded, &generation, CONFIGURATION_ZONES,
+                                            configuration_zone_count()) == CONFIGURATION_REPOSITORY_CORRUPT);
+    assert(configuration_repository_encode(&configuration, 3U, blob, sizeof(blob), &blob_length) ==
+           CONFIGURATION_REPOSITORY_OK);
+    blob[4] = 2U;
+    assert(configuration_repository_decode(blob, blob_length, &loaded, &generation, CONFIGURATION_ZONES,
+                                            configuration_zone_count()) == CONFIGURATION_REPOSITORY_INCOMPATIBLE);
+    assert(configuration_repository_encode(&configuration, 3U, blob, sizeof(blob), &blob_length) ==
+           CONFIGURATION_REPOSITORY_OK);
+    blob[10] = 0xffU;
+    blob[11] = 0xffU;
+    assert(configuration_repository_decode(blob, blob_length, &loaded, &generation, CONFIGURATION_ZONES,
+                                            configuration_zone_count()) == CONFIGURATION_REPOSITORY_CORRUPT);
+
+    IrrigationConfiguration invalid = configuration;
+    (void)snprintf(invalid.programs[0].steps[0].zone_id,
+                   sizeof(invalid.programs[0].steps[0].zone_id), "%s", "missing-zone");
+    assert(configuration_repository_encode(&invalid, 4U, blob, sizeof(blob), &blob_length) ==
+           CONFIGURATION_REPOSITORY_OK);
+    assert(configuration_repository_decode(blob, blob_length, &loaded, &generation, CONFIGURATION_ZONES,
+                                            configuration_zone_count()) == CONFIGURATION_REPOSITORY_INVALID_CONFIGURATION);
+
+    initialize_mock_repository(&repository, &storage);
+    assert(configuration_repository_save(&repository, &configuration, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    storage.fail_write = true;
+    assert(configuration_repository_save(&repository, &second, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_STORAGE_ERROR);
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 1U);
+    assert_configuration_equal(&loaded, &configuration);
+    storage.fail_write = false;
+    storage.fail_commit = true;
+    assert(configuration_repository_save(&repository, &second, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_STORAGE_ERROR);
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 1U);
+    assert_configuration_equal(&loaded, &configuration);
+    storage.fail_commit = false;
+    storage.corrupt_after_commit = true;
+    assert(configuration_repository_save(&repository, &second, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_CORRUPT);
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 1U);
+    assert_configuration_equal(&loaded, &configuration);
+
+    IrrigationConfiguration boundary = configuration;
+    while (boundary.program_count < IRRIGATION_MAX_PROGRAMS) {
+        const size_t index = boundary.program_count++;
+        boundary.programs[index] = boundary.programs[0];
+        (void)snprintf(boundary.programs[index].program_id, sizeof(boundary.programs[index].program_id),
+                       "program-boundary-%u", (unsigned)index);
+        (void)snprintf(boundary.programs[index].display_name,
+                       sizeof(boundary.programs[index].display_name), "Program %u", (unsigned)index);
+        boundary.programs[index].step_count = IRRIGATION_MAX_PROGRAM_STEPS;
+        for (size_t step = 0U; step < IRRIGATION_MAX_PROGRAM_STEPS; ++step) {
+            (void)snprintf(boundary.programs[index].steps[step].zone_id,
+                           sizeof(boundary.programs[index].steps[step].zone_id), "%s", "zone-1");
+            boundary.programs[index].steps[step].duration_ms = 1U;
+        }
+    }
+    while (boundary.schedule_count < IRRIGATION_MAX_SCHEDULES) {
+        const size_t index = boundary.schedule_count++;
+        boundary.schedules[index] = boundary.schedules[0];
+        (void)snprintf(boundary.schedules[index].schedule_id,
+                       sizeof(boundary.schedules[index].schedule_id), "schedule-boundary-%u",
+                       (unsigned)index);
+    }
+    assert(irrigation_configuration_validate(&boundary, CONFIGURATION_ZONES,
+                                             sizeof(CONFIGURATION_ZONES) / sizeof(CONFIGURATION_ZONES[0])) ==
+           IRRIGATION_RESULT_OK);
+    assert(configuration_repository_encode(&boundary, 11U, blob, sizeof(blob), &blob_length) ==
+           CONFIGURATION_REPOSITORY_OK);
+    assert(blob_length <= CONFIGURATION_REPOSITORY_MAX_BLOB_SIZE);
+    assert(configuration_repository_decode(blob, blob_length, &loaded, &generation, CONFIGURATION_ZONES,
+                                            sizeof(CONFIGURATION_ZONES) / sizeof(CONFIGURATION_ZONES[0])) ==
+           CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 11U);
+    assert_configuration_equal(&loaded, &boundary);
 }
 
 static void test_configuration_manager_mutations(void)
@@ -1139,6 +1451,7 @@ static void test_scheduler_handles_midnight_rollover(void)
 int main(void)
 {
     test_irrigation_configuration_validation();
+    test_configuration_repository();
     test_configuration_manager_mutations();
     test_dev_kit_zone_names();
     test_configuration_manager_preserves_scheduler_occurrence();
