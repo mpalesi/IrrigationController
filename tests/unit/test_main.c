@@ -6,6 +6,7 @@
 #include "app/clock.h"
 #include "app/commands/command_bus.h"
 #include "app/commands/zone_command_handler.h"
+#include "app/configuration/configuration_manager.h"
 #include "app/events/event_bus.h"
 #include "app/state/state_store.h"
 #include "domain/master_valve/master_valve_service.h"
@@ -56,6 +57,121 @@ static const Zone ZONES[] = {
     {.id = "zone-1", .output = &OUTPUT_ONE, .enabled = true, .default_duration_ms = 100U},
     {.id = "zone-2", .output = &OUTPUT_TWO, .enabled = true, .default_duration_ms = 200U},
 };
+
+static const Zone CONFIGURATION_ZONES[] = {
+    {.id = "zone-1", .output = &OUTPUT_ONE, .enabled = true, .default_duration_ms = 100U},
+    {.id = "zone-2", .output = &OUTPUT_TWO, .enabled = true, .default_duration_ms = 200U},
+    {.id = "zone-3", .output = &OUTPUT_ONE, .enabled = true, .default_duration_ms = 100U},
+    {.id = "zone-4", .output = &OUTPUT_TWO, .enabled = true, .default_duration_ms = 200U},
+};
+
+static void test_irrigation_configuration_validation(void)
+{
+    ConfigurationManager manager;
+    assert(configuration_manager_init_dev_kit_defaults(&manager, CONFIGURATION_ZONES,
+                                                       sizeof(CONFIGURATION_ZONES) / sizeof(CONFIGURATION_ZONES[0])) ==
+           IRRIGATION_RESULT_OK);
+    const IrrigationConfiguration *defaults = configuration_manager_get(&manager);
+    assert(defaults != NULL);
+    assert(defaults->zone_count == 4U);
+    assert(defaults->program_count == 1U);
+    assert(defaults->schedule_count == 1U);
+    assert(strcmp(defaults->programs[0].program_id, "dev-program") == 0);
+    assert(strcmp(defaults->programs[0].display_name, "dev-program") == 0);
+    assert(irrigation_configuration_validate(defaults, CONFIGURATION_ZONES,
+                                             sizeof(CONFIGURATION_ZONES) / sizeof(CONFIGURATION_ZONES[0])) ==
+           IRRIGATION_RESULT_OK);
+
+    IrrigationConfiguration candidate = *defaults;
+    candidate.program_count = 2U;
+    candidate.programs[1] = candidate.programs[0];
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    candidate.schedule_count = 2U;
+    candidate.schedules[1] = candidate.schedules[0];
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    (void)snprintf(candidate.programs[0].steps[0].zone_id,
+                   sizeof(candidate.programs[0].steps[0].zone_id), "%s", "missing-zone");
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    (void)snprintf(candidate.schedules[0].program_id, sizeof(candidate.schedules[0].program_id), "%s",
+                   "missing-program");
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    candidate.schedules[0].weekday_mask = 0U;
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    candidate.schedules[0].weekday_mask = 1U << 7U;
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    candidate.schedules[0].hour = 24U;
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    candidate.schedules[0].minute = 60U;
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    candidate.program_count = IRRIGATION_MAX_PROGRAMS + 1U;
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+
+    candidate = *defaults;
+    candidate.schedule_count = IRRIGATION_MAX_SCHEDULES + 1U;
+    assert(configuration_manager_validate_candidate(&manager, &candidate) == IRRIGATION_RESULT_REJECTED);
+}
+
+static void test_configuration_manager_mutations(void)
+{
+    ConfigurationManager manager;
+    const IrrigationProgramStepConfiguration steps[] = {
+        {.zone_id = "zone-1", .duration_ms = 1000U},
+        {.zone_id = "zone-2", .duration_ms = 2000U},
+    };
+    assert(configuration_manager_init_dev_kit_defaults(&manager, CONFIGURATION_ZONES,
+                                                       sizeof(CONFIGURATION_ZONES) / sizeof(CONFIGURATION_ZONES[0])) ==
+           IRRIGATION_RESULT_OK);
+    assert(configuration_manager_rename_zone(&manager, "zone-1", "Front lawn") == IRRIGATION_RESULT_OK);
+    assert(strcmp(configuration_manager_zone_name(&manager, "zone-1"), "Front lawn") == 0);
+
+    size_t program_index;
+    assert(configuration_manager_create_program(&manager, "Evening", steps, 2U, &program_index) == IRRIGATION_RESULT_OK);
+    assert(program_index == 1U);
+    const IrrigationConfiguration *configuration = configuration_manager_get(&manager);
+    assert(strcmp(configuration->programs[program_index].program_id, "program-1") == 0);
+    assert(configuration_manager_update_program(&manager, program_index, "Evening revised", steps, 2U) == IRRIGATION_RESULT_OK);
+    assert(strcmp(configuration_manager_get(&manager)->programs[program_index].program_id, "program-1") == 0);
+
+    const IrrigationConfiguration before_invalid_update = *configuration_manager_get(&manager);
+    const IrrigationProgramStepConfiguration invalid_steps[] = {{.zone_id = "missing", .duration_ms = 1000U}};
+    assert(configuration_manager_update_program(&manager, program_index, "Invalid", invalid_steps, 1U) == IRRIGATION_RESULT_REJECTED);
+    assert(memcmp(&before_invalid_update, configuration_manager_get(&manager), sizeof(before_invalid_update)) == 0);
+
+    size_t schedule_index;
+    assert(configuration_manager_create_schedule(&manager, SCHEDULER_WEEKDAY_MASK(0U), 19U, 30U,
+                                                 "program-1", &schedule_index) == IRRIGATION_RESULT_OK);
+    assert(schedule_index == 1U);
+    assert(strcmp(configuration_manager_get(&manager)->schedules[schedule_index].schedule_id, "schedule-1") == 0);
+    assert(configuration_manager_update_schedule(&manager, schedule_index, SCHEDULER_WEEKDAY_MASK(2U),
+                                                 20U, 15U, "program-1") == IRRIGATION_RESULT_OK);
+    assert(strcmp(configuration_manager_get(&manager)->schedules[schedule_index].schedule_id, "schedule-1") == 0);
+    assert(configuration_manager_set_schedule_enabled(&manager, schedule_index, true) == IRRIGATION_RESULT_OK);
+    assert(configuration_manager_get(&manager)->schedules[schedule_index].enabled);
+    assert(configuration_manager_delete_program(&manager, program_index) == IRRIGATION_RESULT_REFERENCED);
+    assert(configuration_manager_delete_schedule(&manager, schedule_index) == IRRIGATION_RESULT_OK);
+    assert(configuration_manager_delete_program(&manager, program_index) == IRRIGATION_RESULT_OK);
+
+    const IrrigationConfiguration before_invalid_schedule = *configuration_manager_get(&manager);
+    assert(configuration_manager_create_schedule(&manager, SCHEDULER_WEEKDAY_MASK(0U), 6U, 0U,
+                                                 "missing", NULL) == IRRIGATION_RESULT_REJECTED);
+    assert(memcmp(&before_invalid_schedule, configuration_manager_get(&manager), sizeof(before_invalid_schedule)) == 0);
+}
 
 static void test_dev_kit_zone_names(void)
 {
@@ -249,6 +365,51 @@ static void initialize_store(StateStore *store)
     initialize_store_with_closed_master_valve(store);
     assert(state_store_begin_master_valve_open(store, 0U) == IRRIGATION_RESULT_OK);
     assert(state_store_complete_master_valve_pre_open_delay(store, 0U) == IRRIGATION_RESULT_OK);
+}
+
+static void test_configuration_manager_preserves_scheduler_occurrence(void)
+{
+    ConfigurationManager manager;
+    StateStore store;
+    FakeClock clock = {0};
+    EventRecorder recorder = {0};
+    EventBus bus;
+    VirtualOutputDriver zone_driver;
+    FakeMasterValveDriver master_driver;
+    MasterValveService master_service;
+    ProgramService program_service;
+    SchedulerService scheduler;
+    virtual_output_driver_init(&zone_driver, (Logger){0});
+    fake_master_valve_driver_init(&master_driver);
+    initialize_store_with_closed_master_valve(&store);
+    master_valve_service_init(&master_service, &store, &master_driver.base,
+                              (Clock){.now_ms = fake_now_ms, .context = &clock},
+                              (MasterValveConfiguration){0});
+    ZoneService zone_service = make_service(&store, &zone_driver.base, &recorder, &clock, &bus);
+    program_service_init(&program_service, &store, &master_service, &zone_service,
+                         (Clock){.now_ms = fake_now_ms, .context = &clock});
+    scheduler_service_init(&scheduler, &store, &program_service);
+    assert(configuration_manager_init_dev_kit_defaults(&manager, CONFIGURATION_ZONES,
+                                                       sizeof(CONFIGURATION_ZONES) / sizeof(CONFIGURATION_ZONES[0])) ==
+           IRRIGATION_RESULT_OK);
+    assert(configuration_manager_update_schedule(&manager, 0U, SCHEDULER_WEEKDAY_MASK(0U), 6U, 0U,
+                                                 "dev-program") == IRRIGATION_RESULT_OK);
+    assert(configuration_manager_set_schedule_enabled(&manager, 0U, true) == IRRIGATION_RESULT_OK);
+    assert(configuration_manager_configure_scheduler(&manager, &scheduler) == IRRIGATION_RESULT_OK);
+    assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 3U, .weekday = 0U,
+                                                                  .hour = 6U}) == IRRIGATION_RESULT_OK);
+    assert(master_driver.open_calls == 1U);
+    const RuntimeState before = state_store_snapshot(&store);
+    assert(before.scheduler.last_occurrence_status[0] == SCHEDULE_OCCURRENCE_STARTED);
+    assert(configuration_manager_create_schedule(&manager, SCHEDULER_WEEKDAY_MASK(1U), 7U, 0U,
+                                                 "dev-program", NULL) == IRRIGATION_RESULT_OK);
+    assert(configuration_manager_configure_scheduler(&manager, &scheduler) == IRRIGATION_RESULT_OK);
+    const RuntimeState after = state_store_snapshot(&store);
+    assert(after.scheduler.last_handled_occurrence[0] == before.scheduler.last_handled_occurrence[0]);
+    assert(after.scheduler.last_occurrence_status[0] == SCHEDULE_OCCURRENCE_STARTED);
+    assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 3U, .weekday = 0U,
+                                                                  .hour = 6U}) == IRRIGATION_RESULT_OK);
+    assert(master_driver.open_calls == 1U);
 }
 
 static void test_open_close_and_authority(void)
@@ -977,7 +1138,10 @@ static void test_scheduler_handles_midnight_rollover(void)
 
 int main(void)
 {
+    test_irrigation_configuration_validation();
+    test_configuration_manager_mutations();
     test_dev_kit_zone_names();
+    test_configuration_manager_preserves_scheduler_occurrence();
     test_open_close_and_authority();
     test_invalid_and_forbidden_transitions();
     test_failed_on_safe_close_and_start_lockout();

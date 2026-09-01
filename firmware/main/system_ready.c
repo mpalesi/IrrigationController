@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "esp_event.h"
@@ -13,6 +14,7 @@
 #include "nvs_flash.h"
 
 #include "app/clock.h"
+#include "app/configuration/configuration_manager.h"
 #include "app/events/event_bus.h"
 #include "app/result.h"
 #include "app/state/state_store.h"
@@ -33,8 +35,7 @@ static MasterValveService master_valve_service;
 static ProgramService program_service;
 static SchedulerService scheduler_service;
 static DevKitWebContext web_context;
-static DevKitProgramConfiguration program_configuration;
-static DevKitZoneConfiguration zone_configuration;
+static ConfigurationManager configuration_manager;
 
 static const Output DEV_OUTPUTS[] = {
     {.id = "dev-output-1", .driver_output_index = 0U},
@@ -48,11 +49,6 @@ static const Zone DEV_ZONES[] = {
     {.id = "zone-3", .output = &DEV_OUTPUTS[2], .enabled = true, .default_duration_ms = 30000U},
     {.id = "zone-4", .output = &DEV_OUTPUTS[3], .enabled = true, .default_duration_ms = 30000U},
 };
-static const SchedulerEntry DEV_SCHEDULES[] = {
-    {.id = "dev-monday-0600", .enabled = false, .weekday_mask = SCHEDULER_WEEKDAY_MASK(0U),
-     .hour = 6U, .minute = 0U, .program = &program_configuration.programs[0]},
-};
-
 static void initialize_local_time(void);
 
 static uint64_t esp_clock_now_ms(void *context)
@@ -157,18 +153,6 @@ static void log_event(const Event *event, void *context)
     ESP_LOGI(TAG, "event type=%d source=%s", event->type, event->source);
 }
 
-static void initialize_dev_program_configuration(void)
-{
-    program_configuration.in_use[0] = true;
-    (void)snprintf(program_configuration.names[0], sizeof(program_configuration.names[0]), "%s", "dev-program");
-    (void)snprintf(program_configuration.zone_ids[0][0], sizeof(program_configuration.zone_ids[0][0]), "%s", "zone-1");
-    (void)snprintf(program_configuration.zone_ids[0][1], sizeof(program_configuration.zone_ids[0][1]), "%s", "zone-2");
-    program_configuration.steps[0][0] = (ProgramStep){.zone_id = program_configuration.zone_ids[0][0], .duration_ms = 30000U};
-    program_configuration.steps[0][1] = (ProgramStep){.zone_id = program_configuration.zone_ids[0][1], .duration_ms = 30000U};
-    program_configuration.programs[0] = (Program){.id = program_configuration.names[0],
-                                                   .steps = program_configuration.steps[0], .step_count = 2U};
-}
-
 void app_main(void)
 {
     state_store_init(&state_store);
@@ -195,8 +179,12 @@ void app_main(void)
     (void)event_bus_publish(&event_bus, &ready_event);
 
     Clock clock = {.now_ms = esp_clock_now_ms, .context = NULL};
-    initialize_dev_program_configuration();
-    dev_kit_zone_configuration_init(&zone_configuration, sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0]));
+    if (configuration_manager_init_dev_kit_defaults(&configuration_manager, DEV_ZONES,
+                                                     sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0])) !=
+        IRRIGATION_RESULT_OK) {
+        ESP_LOGE(TAG, "unable to initialize DEV_KIT configuration defaults");
+        return;
+    }
     if (state_store_configure_zones(&state_store, DEV_ZONES,
                                     sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0])) != IRRIGATION_RESULT_OK) {
         ESP_LOGE(TAG, "unable to configure DEV_KIT zones");
@@ -208,15 +196,17 @@ void app_main(void)
                       master_valve_service_zone_start_precondition(&master_valve_service));
     program_service_init(&program_service, &state_store, &master_valve_service, &zone_service, clock);
     scheduler_service_init(&scheduler_service, &state_store, &program_service);
-    (void)scheduler_service_configure(&scheduler_service, DEV_SCHEDULES,
-                                      sizeof(DEV_SCHEDULES) / sizeof(DEV_SCHEDULES[0]));
+    if (configuration_manager_configure_scheduler(&configuration_manager, &scheduler_service) !=
+        IRRIGATION_RESULT_OK) {
+        ESP_LOGE(TAG, "unable to configure scheduler");
+        return;
+    }
     web_context = (DevKitWebContext){
         .state_store = &state_store, .zone_service = &zone_service,
         .master_valve_service = &master_valve_service, .program_service = &program_service,
         .scheduler_service = &scheduler_service, .zones = DEV_ZONES,
         .zone_count = sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0]),
-        .zone_configuration = &zone_configuration,
-        .program_configuration = &program_configuration,
+        .configuration_manager = &configuration_manager,
     };
     (void)xTaskCreate(scheduler_task, "scheduler", 6144U, &scheduler_service, 4U, NULL);
     initialize_wifi();
