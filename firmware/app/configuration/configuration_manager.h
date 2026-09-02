@@ -21,6 +21,7 @@ typedef struct {
     size_t board_zone_count;
     ConfigurationRepository *repository;
     bool persistence_required;
+    SchedulerService *scheduler_service;
     Program runtime_programs[IRRIGATION_MAX_PROGRAMS];
     ProgramStep runtime_program_steps[IRRIGATION_MAX_PROGRAMS][IRRIGATION_MAX_PROGRAM_STEPS];
     char runtime_program_ids[IRRIGATION_MAX_PROGRAMS][IRRIGATION_CONFIGURATION_ID_SIZE];
@@ -39,6 +40,8 @@ IrrigationResult configuration_manager_init_dev_kit_defaults(ConfigurationManage
 void configuration_manager_set_repository(ConfigurationManager *manager,
                                           ConfigurationRepository *repository,
                                           bool persistence_required);
+void configuration_manager_bind_scheduler(ConfigurationManager *manager,
+                                          SchedulerService *scheduler_service);
 ConfigurationManagerBootResult configuration_manager_load_or_persist_defaults(
     ConfigurationManager *manager, ConfigurationRepository *repository);
 const IrrigationConfiguration *configuration_manager_get(const ConfigurationManager *manager);

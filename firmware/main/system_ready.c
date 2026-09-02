@@ -35,6 +35,7 @@ static ZoneService zone_service;
 static MasterValveService master_valve_service;
 static ProgramService program_service;
 static SchedulerService scheduler_service;
+static SemaphoreHandle_t scheduler_configuration_mutex;
 static DevKitWebContext web_context;
 static ConfigurationManager configuration_manager;
 static ConfigurationRepository configuration_repository;
@@ -52,6 +53,16 @@ static const Zone DEV_ZONES[] = {
     {.id = "zone-4", .output = &DEV_OUTPUTS[3], .enabled = true, .default_duration_ms = 30000U},
 };
 static void initialize_local_time(void);
+
+static void scheduler_lock(void *context)
+{
+    (void)xSemaphoreTake((SemaphoreHandle_t)context, portMAX_DELAY);
+}
+
+static void scheduler_unlock(void *context)
+{
+    (void)xSemaphoreGive((SemaphoreHandle_t)context);
+}
 
 static uint64_t esp_clock_now_ms(void *context)
 {
@@ -232,11 +243,20 @@ void app_main(void)
                       master_valve_service_zone_start_precondition(&master_valve_service));
     program_service_init(&program_service, &state_store, &master_valve_service, &zone_service, clock);
     scheduler_service_init(&scheduler_service, &state_store, &program_service);
+    scheduler_configuration_mutex = xSemaphoreCreateMutex();
+    if (scheduler_configuration_mutex == NULL) {
+        ESP_LOGE(TAG, "unable to create scheduler configuration mutex");
+        return;
+    }
+    scheduler_service_set_synchronization(&scheduler_service, (SchedulerServiceSynchronization){
+        .context = scheduler_configuration_mutex, .lock = scheduler_lock, .unlock = scheduler_unlock,
+    });
     if (configuration_manager_configure_scheduler(&configuration_manager, &scheduler_service) !=
         IRRIGATION_RESULT_OK) {
         ESP_LOGE(TAG, "unable to configure scheduler");
         return;
     }
+    configuration_manager_bind_scheduler(&configuration_manager, &scheduler_service);
     web_context = (DevKitWebContext){
         .state_store = &state_store, .zone_service = &zone_service,
         .master_valve_service = &master_valve_service, .program_service = &program_service,

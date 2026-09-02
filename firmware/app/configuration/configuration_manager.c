@@ -38,41 +38,61 @@ static int unused_slot(const bool *slots, size_t count)
     return -1;
 }
 
-static void rebuild_runtime_views(ConfigurationManager *manager)
+static bool programs_are_equal(const IrrigationConfiguration *left,
+                               const IrrigationConfiguration *right)
+{
+    if (left->program_count != right->program_count) return false;
+    for (size_t index = 0U; index < left->program_count; ++index) {
+        const IrrigationProgramConfiguration *a = &left->programs[index];
+        const IrrigationProgramConfiguration *b = &right->programs[index];
+        if (strcmp(a->program_id, b->program_id) != 0 || strcmp(a->display_name, b->display_name) != 0 ||
+            a->step_count != b->step_count) return false;
+        for (size_t step = 0U; step < a->step_count; ++step) {
+            if (strcmp(a->steps[step].zone_id, b->steps[step].zone_id) != 0 ||
+                a->steps[step].duration_ms != b->steps[step].duration_ms) return false;
+        }
+    }
+    return true;
+}
+
+static void rebuild_runtime_views(ConfigurationManager *manager,
+                                  const IrrigationConfiguration *configuration,
+                                  bool rebuild_programs)
 {
     bool program_slots_in_use[IRRIGATION_MAX_PROGRAMS] = {false};
     bool schedule_slots_in_use[IRRIGATION_MAX_SCHEDULES] = {false};
-    for (size_t program_index = 0U; program_index < manager->configuration.program_count; ++program_index) {
-        const IrrigationProgramConfiguration *configured = &manager->configuration.programs[program_index];
-        int slot = program_slot_for_id(manager, configured->program_id);
-        if (slot < 0) slot = unused_slot(manager->runtime_program_slots, IRRIGATION_MAX_PROGRAMS);
-        if (slot < 0) return;
-        program_slots_in_use[slot] = true;
-        manager->runtime_program_slots[slot] = true;
-        copy_text(manager->runtime_program_ids[slot], sizeof(manager->runtime_program_ids[slot]), configured->program_id);
-        copy_text(manager->runtime_program_names[slot], sizeof(manager->runtime_program_names[slot]), configured->display_name);
-        for (size_t step_index = 0U; step_index < configured->step_count; ++step_index) {
-            copy_text(manager->runtime_step_zone_ids[slot][step_index], sizeof(manager->runtime_step_zone_ids[slot][step_index]), configured->steps[step_index].zone_id);
-            manager->runtime_program_steps[slot][step_index] = (ProgramStep){
-                .zone_id = manager->runtime_step_zone_ids[slot][step_index],
-                .duration_ms = configured->steps[step_index].duration_ms,
+    if (rebuild_programs) {
+        for (size_t program_index = 0U; program_index < configuration->program_count; ++program_index) {
+            const IrrigationProgramConfiguration *configured = &configuration->programs[program_index];
+            int slot = program_slot_for_id(manager, configured->program_id);
+            if (slot < 0) slot = unused_slot(manager->runtime_program_slots, IRRIGATION_MAX_PROGRAMS);
+            if (slot < 0) return;
+            program_slots_in_use[slot] = true;
+            manager->runtime_program_slots[slot] = true;
+            copy_text(manager->runtime_program_ids[slot], sizeof(manager->runtime_program_ids[slot]), configured->program_id);
+            copy_text(manager->runtime_program_names[slot], sizeof(manager->runtime_program_names[slot]), configured->display_name);
+            for (size_t step_index = 0U; step_index < configured->step_count; ++step_index) {
+                copy_text(manager->runtime_step_zone_ids[slot][step_index], sizeof(manager->runtime_step_zone_ids[slot][step_index]), configured->steps[step_index].zone_id);
+                manager->runtime_program_steps[slot][step_index] = (ProgramStep){
+                    .zone_id = manager->runtime_step_zone_ids[slot][step_index],
+                    .duration_ms = configured->steps[step_index].duration_ms,
+                };
+            }
+            manager->runtime_programs[slot] = (Program){
+                .id = manager->runtime_program_names[slot], .steps = manager->runtime_program_steps[slot],
+                .step_count = configured->step_count,
             };
         }
-        manager->runtime_programs[slot] = (Program){
-            /* Legacy Program.id remains the editable name until the runtime model is migrated. */
-            .id = manager->runtime_program_names[slot], .steps = manager->runtime_program_steps[slot],
-            .step_count = configured->step_count,
-        };
+        for (size_t index = 0U; index < IRRIGATION_MAX_PROGRAMS; ++index) manager->runtime_program_slots[index] = program_slots_in_use[index];
     }
-    for (size_t index = 0U; index < IRRIGATION_MAX_PROGRAMS; ++index) manager->runtime_program_slots[index] = program_slots_in_use[index];
 
-    for (size_t schedule_index = 0U; schedule_index < manager->configuration.schedule_count; ++schedule_index) {
-        const IrrigationScheduleConfiguration *configured = &manager->configuration.schedules[schedule_index];
-        const int program_index = program_index_for_id(&manager->configuration, configured->program_id);
+    for (size_t schedule_index = 0U; schedule_index < configuration->schedule_count; ++schedule_index) {
+        const IrrigationScheduleConfiguration *configured = &configuration->schedules[schedule_index];
+        const int program_index = program_index_for_id(configuration, configured->program_id);
         int slot = schedule_slot_for_id(manager, configured->schedule_id);
         if (slot < 0) slot = unused_slot(manager->runtime_schedule_slots, IRRIGATION_MAX_SCHEDULES);
         if (slot < 0 || program_index < 0) return;
-        const int program_slot = program_slot_for_id(manager, manager->configuration.programs[program_index].program_id);
+        const int program_slot = program_slot_for_id(manager, configuration->programs[program_index].program_id);
         if (program_slot < 0) return;
         schedule_slots_in_use[slot] = true;
         manager->runtime_schedule_slots[slot] = true;
@@ -92,17 +112,43 @@ static IrrigationResult replace_candidate(ConfigurationManager *manager)
     if (result != IRRIGATION_RESULT_OK) {
         return result;
     }
-    if (manager->repository == NULL) {
-        if (manager->persistence_required) {
-            return IRRIGATION_RESULT_INTERNAL_ERROR;
+    const bool programs_changed = !programs_are_equal(&manager->configuration, &manager->candidate);
+    if (manager->scheduler_service != NULL) {
+        scheduler_service_lock(manager->scheduler_service);
+        rebuild_runtime_views(manager, &manager->candidate, programs_changed);
+        result = scheduler_service_configure_locked(manager->scheduler_service, manager->runtime_schedules,
+                                                    manager->candidate.schedule_count);
+        if (result != IRRIGATION_RESULT_OK) {
+            rebuild_runtime_views(manager, &manager->configuration, programs_changed);
+            const IrrigationResult rollback = scheduler_service_configure_locked(
+                manager->scheduler_service, manager->runtime_schedules,
+                manager->configuration.schedule_count);
+            scheduler_service_unlock(manager->scheduler_service);
+            return rollback == IRRIGATION_RESULT_OK ? result : IRRIGATION_RESULT_INTERNAL_ERROR;
         }
+    }
+    if (manager->repository == NULL) {
+        if (manager->persistence_required) result = IRRIGATION_RESULT_INTERNAL_ERROR;
     } else if (configuration_repository_save(manager->repository, &manager->candidate,
                                              manager->board_zones, manager->board_zone_count) !=
-               CONFIGURATION_REPOSITORY_OK) {
-        return IRRIGATION_RESULT_INTERNAL_ERROR;
+               CONFIGURATION_REPOSITORY_OK) result = IRRIGATION_RESULT_INTERNAL_ERROR;
+    if (result != IRRIGATION_RESULT_OK) {
+        if (manager->scheduler_service != NULL) {
+            rebuild_runtime_views(manager, &manager->configuration, programs_changed);
+            const IrrigationResult rollback = scheduler_service_configure_locked(
+                manager->scheduler_service, manager->runtime_schedules,
+                manager->configuration.schedule_count);
+            scheduler_service_unlock(manager->scheduler_service);
+            if (rollback != IRRIGATION_RESULT_OK) return IRRIGATION_RESULT_INTERNAL_ERROR;
+        }
+        return result;
     }
     manager->configuration = manager->candidate;
-    rebuild_runtime_views(manager);
+    if (manager->scheduler_service == NULL) {
+        rebuild_runtime_views(manager, &manager->configuration, programs_changed);
+    } else {
+        scheduler_service_unlock(manager->scheduler_service);
+    }
     return IRRIGATION_RESULT_OK;
 }
 
@@ -134,7 +180,7 @@ IrrigationResult configuration_manager_init_dev_kit_defaults(ConfigurationManage
     schedule->enabled = false; schedule->weekday_mask = 1U; schedule->hour = 6U; schedule->minute = 0U;
     copy_text(schedule->program_id, sizeof(schedule->program_id), program->program_id);
     IrrigationResult result = irrigation_configuration_validate(configuration, board_zones, board_zone_count);
-    if (result == IRRIGATION_RESULT_OK) rebuild_runtime_views(manager);
+    if (result == IRRIGATION_RESULT_OK) rebuild_runtime_views(manager, configuration, true);
     return result;
 }
 
@@ -149,6 +195,12 @@ void configuration_manager_set_repository(ConfigurationManager *manager,
     manager->persistence_required = persistence_required;
 }
 
+void configuration_manager_bind_scheduler(ConfigurationManager *manager,
+                                          SchedulerService *scheduler_service)
+{
+    if (manager != NULL) manager->scheduler_service = scheduler_service;
+}
+
 ConfigurationManagerBootResult configuration_manager_load_or_persist_defaults(
     ConfigurationManager *manager, ConfigurationRepository *repository)
 {
@@ -160,7 +212,7 @@ ConfigurationManagerBootResult configuration_manager_load_or_persist_defaults(
         repository, &manager->candidate, &generation, manager->board_zones, manager->board_zone_count);
     if (result == CONFIGURATION_REPOSITORY_OK) {
         manager->configuration = manager->candidate;
-        rebuild_runtime_views(manager);
+        rebuild_runtime_views(manager, &manager->configuration, true);
         return CONFIGURATION_MANAGER_BOOT_LOADED;
     }
     if (result == CONFIGURATION_REPOSITORY_NOT_FOUND) {

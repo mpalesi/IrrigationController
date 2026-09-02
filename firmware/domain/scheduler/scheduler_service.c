@@ -34,8 +34,37 @@ void scheduler_service_init(SchedulerService *service, StateStore *state_store,
     }
 }
 
+void scheduler_service_set_synchronization(SchedulerService *service,
+                                           SchedulerServiceSynchronization synchronization)
+{
+    if (service != NULL) service->synchronization = synchronization;
+}
+
+void scheduler_service_lock(SchedulerService *service)
+{
+    if (service != NULL && service->synchronization.lock != NULL) {
+        service->synchronization.lock(service->synchronization.context);
+    }
+}
+
+void scheduler_service_unlock(SchedulerService *service)
+{
+    if (service != NULL && service->synchronization.unlock != NULL) {
+        service->synchronization.unlock(service->synchronization.context);
+    }
+}
+
 IrrigationResult scheduler_service_configure(SchedulerService *service, const SchedulerEntry *entries,
                                              size_t entry_count)
+{
+    scheduler_service_lock(service);
+    const IrrigationResult result = scheduler_service_configure_locked(service, entries, entry_count);
+    scheduler_service_unlock(service);
+    return result;
+}
+
+IrrigationResult scheduler_service_configure_locked(SchedulerService *service,
+                                                    const SchedulerEntry *entries, size_t entry_count)
 {
     uint64_t preserved_occurrences[IRRIGATION_MAX_SCHEDULES] = {0};
     ScheduleOccurrenceStatus preserved_statuses[IRRIGATION_MAX_SCHEDULES] = {0};
@@ -84,20 +113,25 @@ IrrigationResult scheduler_service_configure(SchedulerService *service, const Sc
 
 IrrigationResult scheduler_service_set_enabled(SchedulerService *service, size_t entry_index, bool enabled)
 {
+    scheduler_service_lock(service);
     if (service == NULL || entry_index >= service->entry_count) {
+        scheduler_service_unlock(service);
         return IRRIGATION_RESULT_NOT_FOUND;
     }
     IrrigationResult result = state_store_reset_schedule_occurrence(service->state_store, entry_index);
     if (result == IRRIGATION_RESULT_OK) {
         service->entries[entry_index].enabled = enabled;
     }
+    scheduler_service_unlock(service);
     return result;
 }
 
 IrrigationResult scheduler_service_process(SchedulerService *service, SchedulerTime now)
 {
+    scheduler_service_lock(service);
     if (service == NULL || service->state_store == NULL || service->program_service == NULL ||
         !scheduler_time_is_valid(now)) {
+        scheduler_service_unlock(service);
         return IRRIGATION_RESULT_REJECTED;
     }
     const uint16_t current_minute = (uint16_t)now.hour * 60U + now.minute;
@@ -121,5 +155,6 @@ IrrigationResult scheduler_service_process(SchedulerService *service, SchedulerT
         (void)state_store_record_schedule_occurrence(service->state_store, index, occurrence, status);
         state.scheduler.last_handled_occurrence[index] = occurrence;
     }
+    scheduler_service_unlock(service);
     return IRRIGATION_RESULT_OK;
 }

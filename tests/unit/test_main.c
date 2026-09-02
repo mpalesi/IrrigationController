@@ -78,6 +78,28 @@ typedef struct {
     int last_written_slot;
 } MockConfigurationStorage;
 
+typedef struct {
+    unsigned int lock_calls;
+    unsigned int unlock_calls;
+    bool locked;
+} SchedulerLockRecorder;
+
+static void record_scheduler_lock(void *context)
+{
+    SchedulerLockRecorder *recorder = context;
+    assert(!recorder->locked);
+    recorder->locked = true;
+    recorder->lock_calls++;
+}
+
+static void record_scheduler_unlock(void *context)
+{
+    SchedulerLockRecorder *recorder = context;
+    assert(recorder->locked);
+    recorder->locked = false;
+    recorder->unlock_calls++;
+}
+
 static int mock_slot_for_key(const char *key)
 {
     return strcmp(key, CONFIGURATION_REPOSITORY_SLOT_A) == 0 ? 0 :
@@ -821,6 +843,7 @@ static void test_configuration_manager_preserves_scheduler_occurrence(void)
     MasterValveService master_service;
     ProgramService program_service;
     SchedulerService scheduler;
+    SchedulerLockRecorder lock_recorder = {0};
     virtual_output_driver_init(&zone_driver, (Logger){0});
     fake_master_valve_driver_init(&master_driver);
     initialize_store_with_closed_master_valve(&store);
@@ -831,6 +854,9 @@ static void test_configuration_manager_preserves_scheduler_occurrence(void)
     program_service_init(&program_service, &store, &master_service, &zone_service,
                          (Clock){.now_ms = fake_now_ms, .context = &clock});
     scheduler_service_init(&scheduler, &store, &program_service);
+    scheduler_service_set_synchronization(&scheduler, (SchedulerServiceSynchronization){
+        .context = &lock_recorder, .lock = record_scheduler_lock, .unlock = record_scheduler_unlock,
+    });
     assert(configuration_manager_init_dev_kit_defaults(&manager, CONFIGURATION_ZONES,
                                                        sizeof(CONFIGURATION_ZONES) / sizeof(CONFIGURATION_ZONES[0])) ==
            IRRIGATION_RESULT_OK);
@@ -838,6 +864,7 @@ static void test_configuration_manager_preserves_scheduler_occurrence(void)
                                                  "dev-program") == IRRIGATION_RESULT_OK);
     assert(configuration_manager_set_schedule_enabled(&manager, 0U, true) == IRRIGATION_RESULT_OK);
     assert(configuration_manager_configure_scheduler(&manager, &scheduler) == IRRIGATION_RESULT_OK);
+    configuration_manager_bind_scheduler(&manager, &scheduler);
     assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 3U, .weekday = 0U,
                                                                   .hour = 6U}) == IRRIGATION_RESULT_OK);
     assert(master_driver.open_calls == 1U);
@@ -845,13 +872,42 @@ static void test_configuration_manager_preserves_scheduler_occurrence(void)
     assert(before.scheduler.last_occurrence_status[0] == SCHEDULE_OCCURRENCE_STARTED);
     assert(configuration_manager_create_schedule(&manager, SCHEDULER_WEEKDAY_MASK(1U), 7U, 0U,
                                                  "dev-program", NULL) == IRRIGATION_RESULT_OK);
-    assert(configuration_manager_configure_scheduler(&manager, &scheduler) == IRRIGATION_RESULT_OK);
+    assert(scheduler.entry_count == 2U);
     const RuntimeState after = state_store_snapshot(&store);
     assert(after.scheduler.last_handled_occurrence[0] == before.scheduler.last_handled_occurrence[0]);
     assert(after.scheduler.last_occurrence_status[0] == SCHEDULE_OCCURRENCE_STARTED);
     assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 3U, .weekday = 0U,
                                                                   .hour = 6U}) == IRRIGATION_RESULT_OK);
     assert(master_driver.open_calls == 1U);
+    assert(configuration_manager_set_schedule_enabled(&manager, 1U, true) == IRRIGATION_RESULT_OK);
+    assert(scheduler.entries[1].enabled);
+    assert(configuration_manager_delete_schedule(&manager, 1U) == IRRIGATION_RESULT_OK);
+    assert(scheduler.entry_count == 1U);
+    assert(lock_recorder.lock_calls == lock_recorder.unlock_calls && !lock_recorder.locked);
+}
+
+static void test_configuration_manager_scheduler_reconfiguration_failure_rolls_back(void)
+{
+    ConfigurationManager manager;
+    ConfigurationRepository repository;
+    MockConfigurationStorage storage;
+    SchedulerService failing_scheduler = {0};
+    IrrigationConfiguration loaded;
+    uint32_t generation;
+    initialize_mock_repository(&repository, &storage);
+    assert(configuration_manager_init_dev_kit_defaults(&manager, CONFIGURATION_ZONES,
+                                                       configuration_zone_count()) == IRRIGATION_RESULT_OK);
+    assert(configuration_manager_load_or_persist_defaults(&manager, &repository) ==
+           CONFIGURATION_MANAGER_BOOT_DEFAULTS_PERSISTED);
+    configuration_manager_set_repository(&manager, &repository, true);
+    configuration_manager_bind_scheduler(&manager, &failing_scheduler);
+    const IrrigationConfiguration before = *configuration_manager_get(&manager);
+    assert(configuration_manager_set_schedule_enabled(&manager, 0U, true) == IRRIGATION_RESULT_INTERNAL_ERROR);
+    assert_configuration_equal(configuration_manager_get(&manager), &before);
+    assert(configuration_repository_load(&repository, &loaded, &generation, CONFIGURATION_ZONES,
+                                         configuration_zone_count()) == CONFIGURATION_REPOSITORY_OK);
+    assert(generation == 1U);
+    assert_configuration_equal(&loaded, &before);
 }
 
 static void test_open_close_and_authority(void)
@@ -1587,6 +1643,7 @@ int main(void)
     test_configuration_manager_mutations();
     test_dev_kit_zone_names();
     test_configuration_manager_preserves_scheduler_occurrence();
+    test_configuration_manager_scheduler_reconfiguration_failure_rolls_back();
     test_open_close_and_authority();
     test_invalid_and_forbidden_transitions();
     test_failed_on_safe_close_and_start_lockout();
