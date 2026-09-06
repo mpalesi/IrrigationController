@@ -148,7 +148,10 @@ IrrigationResult scheduler_service_process(SchedulerService *service, SchedulerT
         if (program_service_is_active(service->program_service)) {
             status = SCHEDULE_OCCURRENCE_SKIPPED_BUSY;
         } else {
-            status = program_service_start(service->program_service, entry->program) == IRRIGATION_RESULT_OK
+            status = program_service_start_with_context(
+                         service->program_service, entry->program,
+                         (ProgramStartContext){.origin = PROGRAM_EXECUTION_ORIGIN_SCHEDULED,
+                                               .schedule_id = entry->id}) == IRRIGATION_RESULT_OK
                 ? SCHEDULE_OCCURRENCE_STARTED
                 : SCHEDULE_OCCURRENCE_REJECTED;
         }

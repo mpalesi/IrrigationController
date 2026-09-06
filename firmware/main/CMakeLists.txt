@@ -16,6 +16,8 @@ set(IRRIGATION_SOURCES
     "../domain/master_valve/master_valve_driver.c"
     "../domain/master_valve/master_valve_service.c"
     "../domain/programs/program_service.c"
+    "../domain/programs/program_execution.c"
+    "../domain/history/program_execution_history.c"
     "../domain/scheduler/scheduler_service.c"
     "../infrastructure/logging/logger.c"
     "../infrastructure/logging/esp_idf_logger.c"

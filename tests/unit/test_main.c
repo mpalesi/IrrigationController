@@ -10,6 +10,7 @@
 #include "app/events/event_bus.h"
 #include "app/state/state_store.h"
 #include "domain/master_valve/master_valve_service.h"
+#include "domain/history/program_execution_history.h"
 #include "domain/outputs/output.h"
 #include "domain/programs/program_service.h"
 #include "domain/scheduler/scheduler_service.h"
@@ -24,7 +25,7 @@ typedef struct {
 } FakeClock;
 
 typedef struct {
-    Event events[8];
+    Event events[64];
     size_t count;
 } EventRecorder;
 
@@ -1418,6 +1419,129 @@ static void test_program_faults_on_master_close_failure_and_aborts_safely(void)
     assert(master_driver.close_calls == 1U && !master_driver.is_open);
 }
 
+static void test_program_execution_history_lifecycle(void)
+{
+    const ProgramStep steps[] = {{.zone_id = "zone-1", .duration_ms = 10U}};
+    const Program program = {.id = "history-program", .steps = steps, .step_count = 1U,
+                             .post_program_delay_ms = 5U};
+    StateStore store;
+    FakeClock clock = {.now_ms = 100U};
+    EventRecorder recorder = {0};
+    EventBus bus;
+    VirtualOutputDriver zone_driver;
+    FakeMasterValveDriver master_driver;
+    MasterValveService master_service;
+    ProgramService program_service;
+    ProgramExecutionHistory history;
+
+    virtual_output_driver_init(&zone_driver, (Logger){0});
+    fake_master_valve_driver_init(&master_driver);
+    initialize_store_with_closed_master_valve(&store);
+    master_valve_service_init(&master_service, &store, &master_driver.base,
+                              (Clock){.now_ms = fake_now_ms, .context = &clock},
+                              (MasterValveConfiguration){0});
+    ZoneService zone_service = make_service(&store, &zone_driver.base, &recorder, &clock, &bus);
+    program_service_init(&program_service, &store, &master_service, &zone_service,
+                         (Clock){.now_ms = fake_now_ms, .context = &clock});
+    program_execution_history_init(&history, (ProgramExecutionHistoryRepository){0});
+    assert(program_execution_history_subscribe(&history, &bus) == IRRIGATION_RESULT_OK);
+    program_service_set_event_bus(&program_service, &bus);
+
+    assert(program_service_start(&program_service, &program) == IRRIGATION_RESULT_OK);
+    assert(program_execution_history_count(&history) == 0U);
+    assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
+    clock.now_ms = 110U;
+    assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
+    assert(program_execution_history_count(&history) == 0U);
+    clock.now_ms = 115U;
+    assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
+    assert(master_driver.close_calls == 1U && program_execution_history_count(&history) == 1U);
+    const ProgramExecutionHistoryRecord *record = program_execution_history_record_at(&history, 0U);
+    assert(record != NULL && strcmp(record->program_id, "history-program") == 0);
+    assert(record->origin == PROGRAM_EXECUTION_ORIGIN_MANUAL && !record->schedule_id_valid);
+    assert(record->started_at.valid && record->started_at.value_ms == 100U);
+    assert(record->ended_at.valid && record->ended_at.value_ms == 115U);
+    assert(record->planned_duration_ms == 15U && record->actual_duration_ms == 15U);
+    assert(record->result == PROGRAM_EXECUTION_RESULT_COMPLETED);
+    assert(record->steps_started == 1U && record->steps_completed == 1U);
+    assert(record->last_active_zone_id_valid && strcmp(record->last_active_zone_id, "zone-1") == 0);
+
+    /* A scheduled start preserves the occurrence flow while carrying its schedule identity. */
+    state_store_init(&store);
+    assert(state_store_configure_zones(&store, ZONES, sizeof(ZONES) / sizeof(ZONES[0])) == IRRIGATION_RESULT_OK);
+    assert(state_store_transition_system(&store, SYSTEM_STATE_READY) == IRRIGATION_RESULT_OK);
+    fake_master_valve_driver_init(&master_driver);
+    master_valve_service_init(&master_service, &store, &master_driver.base,
+                              (Clock){.now_ms = fake_now_ms, .context = &clock}, (MasterValveConfiguration){0});
+    zone_service = make_service(&store, &zone_driver.base, &recorder, &clock, &bus);
+    assert(program_execution_history_subscribe(&history, &bus) == IRRIGATION_RESULT_OK);
+    program_service_init(&program_service, &store, &master_service, &zone_service,
+                         (Clock){.now_ms = fake_now_ms, .context = &clock});
+    program_service_set_event_bus(&program_service, &bus);
+    SchedulerService scheduler;
+    scheduler_service_init(&scheduler, &store, &program_service);
+    const SchedulerEntry entry = {.id = "history-schedule", .enabled = true,
+                                  .weekday_mask = SCHEDULER_WEEKDAY_MASK(1U), .hour = 6U,
+                                  .minute = 0U, .program = &program};
+    assert(scheduler_service_configure(&scheduler, &entry, 1U) == IRRIGATION_RESULT_OK);
+    clock.now_ms = 200U;
+    assert(scheduler_service_process(&scheduler, (SchedulerTime){.week_index = 3U, .weekday = 1U, .hour = 6U}) ==
+           IRRIGATION_RESULT_OK);
+    assert(state_store_snapshot(&store).scheduler.last_occurrence_status[0] == SCHEDULE_OCCURRENCE_STARTED);
+    assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
+    clock.now_ms = 210U;
+    assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
+    clock.now_ms = 215U;
+    assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
+    record = program_execution_history_record_at(&history, 1U);
+    assert(record != NULL && record->origin == PROGRAM_EXECUTION_ORIGIN_SCHEDULED && record->schedule_id_valid);
+    assert(strcmp(record->schedule_id, "history-schedule") == 0 &&
+           record->result == PROGRAM_EXECUTION_RESULT_COMPLETED);
+
+    assert(program_service_start(&program_service, &program) == IRRIGATION_RESULT_OK);
+    assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
+    assert(program_service_abort(&program_service) == IRRIGATION_RESULT_OK);
+    record = program_execution_history_record_at(&history, 2U);
+    assert(record != NULL && record->result == PROGRAM_EXECUTION_RESULT_ABORTED &&
+           record->steps_started == 1U && record->steps_completed == 0U);
+
+    state_store_init(&store);
+    assert(state_store_configure_zones(&store, ZONES, sizeof(ZONES) / sizeof(ZONES[0])) == IRRIGATION_RESULT_OK);
+    assert(state_store_transition_system(&store, SYSTEM_STATE_READY) == IRRIGATION_RESULT_OK);
+    fake_master_valve_driver_init(&master_driver);
+    master_driver.fail_open = true;
+    master_valve_service_init(&master_service, &store, &master_driver.base,
+                              (Clock){.now_ms = fake_now_ms, .context = &clock}, (MasterValveConfiguration){0});
+    zone_service = make_service(&store, &zone_driver.base, &recorder, &clock, &bus);
+    assert(program_execution_history_subscribe(&history, &bus) == IRRIGATION_RESULT_OK);
+    program_service_init(&program_service, &store, &master_service, &zone_service,
+                         (Clock){.now_ms = fake_now_ms, .context = &clock});
+    program_service_set_event_bus(&program_service, &bus);
+    assert(program_service_start(&program_service, &program) == IRRIGATION_RESULT_INTERNAL_ERROR);
+    record = program_execution_history_record_at(&history, 3U);
+    assert(record != NULL && record->result == PROGRAM_EXECUTION_RESULT_FAULT);
+
+    state_store_init(&store);
+    assert(state_store_configure_zones(&store, ZONES, sizeof(ZONES) / sizeof(ZONES[0])) == IRRIGATION_RESULT_OK);
+    assert(state_store_transition_system(&store, SYSTEM_STATE_READY) == IRRIGATION_RESULT_OK);
+    fake_master_valve_driver_init(&master_driver);
+    master_valve_service_init(&master_service, &store, &master_driver.base,
+                              (Clock){.now_ms = fake_now_ms, .context = &clock}, (MasterValveConfiguration){0});
+    zone_service = make_service(&store, &zone_driver.base, &recorder, &clock, &bus);
+    assert(program_execution_history_subscribe(&history, &bus) == IRRIGATION_RESULT_OK);
+    program_service_init(&program_service, &store, &master_service, &zone_service,
+                         (Clock){.now_ms = fake_now_ms, .context = &clock});
+    program_service_set_event_bus(&program_service, &bus);
+    clock.now_ms = 300U;
+    assert(program_service_start(&program_service, &program) == IRRIGATION_RESULT_OK);
+    assert(program_execution_history_interrupt_active(&history, 320U, true) == IRRIGATION_RESULT_OK);
+    record = program_execution_history_record_at(&history, 4U);
+    assert(record != NULL && record->result == PROGRAM_EXECUTION_RESULT_INTERRUPTED_REBOOT &&
+           record->actual_duration_ms == 20U);
+    state_store_init(&store);
+    assert(state_store_snapshot(&store).program.state == PROGRAM_STATE_IDLE);
+}
+
 static void complete_zero_duration_program(ProgramService *service)
 {
     assert(program_service_process(service) == IRRIGATION_RESULT_OK);
@@ -1659,6 +1783,7 @@ int main(void)
     test_program_zero_durations_complete_deterministically();
     test_program_faults_on_master_or_zone_failures();
     test_program_faults_on_master_close_failure_and_aborts_safely();
+    test_program_execution_history_lifecycle();
     test_scheduler_does_not_catch_up_or_replay_unchanged_entries();
     test_scheduler_recurs_without_duplicate_starts();
     test_scheduler_skips_busy_and_rejected_occurrences();

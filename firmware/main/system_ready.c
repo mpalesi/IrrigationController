@@ -19,6 +19,7 @@
 #include "app/result.h"
 #include "app/state/state_store.h"
 #include "domain/master_valve/master_valve_service.h"
+#include "domain/history/program_execution_history.h"
 #include "domain/outputs/output.h"
 #include "domain/programs/program_service.h"
 #include "domain/scheduler/scheduler_service.h"
@@ -34,6 +35,7 @@ static EventBus event_bus;
 static ZoneService zone_service;
 static MasterValveService master_valve_service;
 static ProgramService program_service;
+static ProgramExecutionHistory program_execution_history;
 static SchedulerService scheduler_service;
 static SemaphoreHandle_t scheduler_configuration_mutex;
 static DevKitWebContext web_context;
@@ -242,6 +244,12 @@ void app_main(void)
     zone_service_init(&zone_service, &state_store, output_driver, &event_bus, clock,
                       master_valve_service_zone_start_precondition(&master_valve_service));
     program_service_init(&program_service, &state_store, &master_valve_service, &zone_service, clock);
+    program_service_set_event_bus(&program_service, &event_bus);
+    program_execution_history_init(&program_execution_history, (ProgramExecutionHistoryRepository){0});
+    if (program_execution_history_subscribe(&program_execution_history, &event_bus) != IRRIGATION_RESULT_OK) {
+        ESP_LOGE(TAG, "unable to subscribe program execution history");
+        return;
+    }
     scheduler_service_init(&scheduler_service, &state_store, &program_service);
     scheduler_configuration_mutex = xSemaphoreCreateMutex();
     if (scheduler_configuration_mutex == NULL) {

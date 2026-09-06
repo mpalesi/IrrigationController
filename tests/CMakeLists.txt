@@ -20,6 +20,8 @@ add_executable(unit_tests
     ../firmware/domain/master_valve/master_valve_driver.c
     ../firmware/domain/master_valve/master_valve_service.c
     ../firmware/domain/programs/program_service.c
+    ../firmware/domain/programs/program_execution.c
+    ../firmware/domain/history/program_execution_history.c
     ../firmware/domain/scheduler/scheduler_service.c
     ../firmware/interfaces/http/dev_kit_zone_configuration.c
     ../firmware/infrastructure/logging/logger.c
