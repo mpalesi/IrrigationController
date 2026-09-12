@@ -19,3 +19,5 @@
 /hardware/kicad/IrrigationController/backup-*/
 /hardware/kicad/IrrigationController/*.OLD.kicad_pcb
 /hardware/kicad/IrrigationController/*.kicad_prl
+
+firmware/build-*/

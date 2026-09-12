@@ -1,9 +1,0 @@
-Command: cmake -G Unix Makefiles -DPYTHON_DEPS_CHECKED=1 -DPYTHON=/Users/mpalesi/.espressif/python_env/idf5.5_py3.9_env/bin/python -DESP_PLATFORM=1 -DCCACHE_ENABLE=0 /Users/mpalesi/dev-git/IrrigationController/firmware
-CMake Error at /Users/mpalesi/esp/esp-idf/tools/cmake/project.cmake:671 (message):
-  SDKCONFIG_DEFAULTS
-  '/Users/mpalesi/dev-git/IrrigationController/firmware/sdkconfig.defaults.irrigation_controller_relay_test'
-  does not exist.
-Call Stack (most recent call first):
-  CMakeLists.txt:4 (project)
-
-
