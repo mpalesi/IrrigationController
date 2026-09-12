@@ -1,0 +1,2 @@
+source /Users/mpalesi/dev-git/IrrigationController/firmware/build-irrigation-controller/gdbinit/symbols
+source /Users/mpalesi/dev-git/IrrigationController/firmware/build-irrigation-controller/gdbinit/connect

@@ -1,0 +1,2 @@
+CMakeFiles/irrigation_controller.elf.dir/project_elf_src_esp32.c.obj: \
+ /Users/mpalesi/dev-git/IrrigationController/firmware/build-irrigation-controller/project_elf_src_esp32.c
