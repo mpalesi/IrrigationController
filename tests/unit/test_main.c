@@ -16,6 +16,7 @@
 #include "domain/scheduler/scheduler_service.h"
 #include "domain/zones/zone.h"
 #include "domain/zones/zone_service.h"
+#include "hal/master_valve/shelly_master_valve_driver.h"
 #include "hal/outputs/virtual_output_driver.h"
 #include "interfaces/http/dev_kit_zone_configuration.h"
 #include "infrastructure/persistence/configuration_repository.h"
@@ -52,6 +53,20 @@ typedef struct {
     unsigned int open_calls;
     unsigned int close_calls;
 } FakeMasterValveDriver;
+
+typedef struct {
+    IrrigationResult result;
+    int http_status;
+    const char *body;
+} FakeShellyHttpResponse;
+
+typedef struct {
+    ShellyHttpTransport base;
+    FakeShellyHttpResponse responses[2];
+    char paths[2][80];
+    size_t response_count;
+    size_t request_count;
+} FakeShellyHttpTransport;
 
 static const Output OUTPUT_ONE = {.id = "output-1", .driver_output_index = 0U};
 static const Output OUTPUT_TWO = {.id = "output-2", .driver_output_index = 1U};
@@ -654,6 +669,109 @@ static void test_dev_kit_zone_names(void)
     assert(strcmp(step.zone_id, "zone-1") == 0);
     assert(dev_kit_zone_configuration_set_name(&configuration, 0U, "") == IRRIGATION_RESULT_REJECTED);
     assert(dev_kit_zone_configuration_set_name(&configuration, 0U, too_long) == IRRIGATION_RESULT_REJECTED);
+}
+
+static IrrigationResult fake_shelly_http_get(ShellyHttpTransport *base, const char *host, uint16_t port,
+                                             const char *path, uint32_t timeout_ms, char *response,
+                                             size_t response_capacity, size_t *response_length,
+                                             int *http_status)
+{
+    FakeShellyHttpTransport *transport = (FakeShellyHttpTransport *)base;
+    assert(strcmp(host, "shelly-master") == 0);
+    assert(port == 80U && timeout_ms == 1000U);
+    assert(transport->request_count < transport->response_count);
+    const size_t index = transport->request_count++;
+    assert(snprintf(transport->paths[index], sizeof(transport->paths[index]), "%s", path) <
+           (int)sizeof(transport->paths[index]));
+    const FakeShellyHttpResponse *configured = &transport->responses[index];
+    if (configured->result != IRRIGATION_RESULT_OK) return configured->result;
+    const size_t length = strlen(configured->body);
+    assert(length < response_capacity);
+    memcpy(response, configured->body, length);
+    *response_length = length;
+    *http_status = configured->http_status;
+    return IRRIGATION_RESULT_OK;
+}
+
+static const ShellyHttpTransportVTable FAKE_SHELLY_HTTP_TRANSPORT_VTABLE = {
+    .get = fake_shelly_http_get,
+};
+
+static void fake_shelly_http_transport_init(FakeShellyHttpTransport *transport,
+                                            FakeShellyHttpResponse first,
+                                            FakeShellyHttpResponse second)
+{
+    *transport = (FakeShellyHttpTransport){
+        .base.vtable = &FAKE_SHELLY_HTTP_TRANSPORT_VTABLE,
+        .responses = {first, second},
+        .response_count = 2U,
+    };
+}
+
+static void test_shelly_master_valve_driver(void)
+{
+    const FakeShellyHttpResponse set_ok = {
+        .result = IRRIGATION_RESULT_OK, .http_status = 200, .body = "{\"was_on\":false}"};
+    FakeShellyHttpTransport transport;
+    ShellyMasterValveDriver driver;
+
+    fake_shelly_http_transport_init(&transport, set_ok,
+                                    (FakeShellyHttpResponse){.result = IRRIGATION_RESULT_OK,
+                                                              .http_status = 200,
+                                                              .body = "{\"output\":true}"});
+    shelly_master_valve_driver_init(&driver, &transport.base, (ShellyMasterValveConfiguration){
+        .host = "shelly-master", .port = 80U, .switch_id = 0U, .operation_timeout_ms = 1000U});
+    assert(master_valve_driver_open_and_confirm(&driver.base) == IRRIGATION_RESULT_OK);
+    assert(transport.request_count == 2U);
+    assert(strcmp(transport.paths[0], "/rpc/Switch.Set?id=0&on=true") == 0);
+    assert(strcmp(transport.paths[1], "/rpc/Switch.GetStatus?id=0") == 0);
+
+    fake_shelly_http_transport_init(&transport, set_ok,
+                                    (FakeShellyHttpResponse){.result = IRRIGATION_RESULT_OK,
+                                                              .http_status = 200,
+                                                              .body = "{\"output\":false}"});
+    shelly_master_valve_driver_init(&driver, &transport.base, (ShellyMasterValveConfiguration){
+        .host = "shelly-master", .port = 80U, .switch_id = 0U, .operation_timeout_ms = 1000U});
+    assert(master_valve_driver_close_and_confirm(&driver.base) == IRRIGATION_RESULT_OK);
+    assert(strcmp(transport.paths[0], "/rpc/Switch.Set?id=0&on=false") == 0);
+
+    fake_shelly_http_transport_init(&transport,
+                                    (FakeShellyHttpResponse){.result = IRRIGATION_RESULT_OK,
+                                                              .http_status = 500,
+                                                              .body = "{\"error\":\"failed\"}"},
+                                    set_ok);
+    shelly_master_valve_driver_init(&driver, &transport.base, (ShellyMasterValveConfiguration){
+        .host = "shelly-master", .port = 80U, .switch_id = 0U, .operation_timeout_ms = 1000U});
+    assert(master_valve_driver_open_and_confirm(&driver.base) == IRRIGATION_RESULT_INTERNAL_ERROR);
+    assert(transport.request_count == 1U);
+
+    fake_shelly_http_transport_init(&transport, set_ok,
+                                    (FakeShellyHttpResponse){.result = IRRIGATION_RESULT_INTERNAL_ERROR});
+    shelly_master_valve_driver_init(&driver, &transport.base, (ShellyMasterValveConfiguration){
+        .host = "shelly-master", .port = 80U, .switch_id = 0U, .operation_timeout_ms = 1000U});
+    assert(master_valve_driver_open_and_confirm(&driver.base) == IRRIGATION_RESULT_INTERNAL_ERROR);
+
+    fake_shelly_http_transport_init(&transport, set_ok,
+                                    (FakeShellyHttpResponse){.result = IRRIGATION_RESULT_OK,
+                                                              .http_status = 200,
+                                                              .body = "{\"output\":true"});
+    shelly_master_valve_driver_init(&driver, &transport.base, (ShellyMasterValveConfiguration){
+        .host = "shelly-master", .port = 80U, .switch_id = 0U, .operation_timeout_ms = 1000U});
+    assert(master_valve_driver_open_and_confirm(&driver.base) == IRRIGATION_RESULT_INTERNAL_ERROR);
+
+    fake_shelly_http_transport_init(&transport, set_ok,
+                                    (FakeShellyHttpResponse){.result = IRRIGATION_RESULT_OK,
+                                                              .http_status = 200,
+                                                              .body = "{\"output\":false}"});
+    shelly_master_valve_driver_init(&driver, &transport.base, (ShellyMasterValveConfiguration){
+        .host = "shelly-master", .port = 80U, .switch_id = 0U, .operation_timeout_ms = 1000U});
+    assert(master_valve_driver_open_and_confirm(&driver.base) == IRRIGATION_RESULT_INTERNAL_ERROR);
+
+    fake_shelly_http_transport_init(&transport,
+                                    (FakeShellyHttpResponse){.result = IRRIGATION_RESULT_TIMEOUT}, set_ok);
+    shelly_master_valve_driver_init(&driver, &transport.base, (ShellyMasterValveConfiguration){
+        .host = "shelly-master", .port = 80U, .switch_id = 0U, .operation_timeout_ms = 1000U});
+    assert(master_valve_driver_open_and_confirm(&driver.base) == IRRIGATION_RESULT_TIMEOUT);
 }
 
 static uint64_t fake_now_ms(void *context)
@@ -1352,7 +1470,7 @@ static void test_program_faults_on_master_or_zone_failures(void)
     assert(!zone_driver.state[1]);
 }
 
-static void test_program_faults_on_master_close_failure_and_aborts_safely(void)
+static void test_program_completes_on_master_close_failure_and_aborts_safely(void)
 {
     const ProgramStep steps[] = {{.zone_id = "zone-1", .duration_ms = 10U},
                                  {.zone_id = "zone-2", .duration_ms = 10U}};
@@ -1383,7 +1501,16 @@ static void test_program_faults_on_master_close_failure_and_aborts_safely(void)
     clock.now_ms = 20U;
     assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
     assert(program_service_process(&program_service) == IRRIGATION_RESULT_INTERNAL_ERROR);
-    assert(program_service_state(&program_service) == PROGRAM_STATE_FAULT);
+    assert(program_service_state(&program_service) == PROGRAM_STATE_COMPLETED);
+    assert(!program_service_is_active(&program_service));
+    assert(master_valve_service_state(&master_service) == MASTER_VALVE_STATE_FAULT);
+
+    master_driver.fail_close = false;
+    assert(program_service_start(&program_service, &program) == IRRIGATION_RESULT_OK);
+    assert(master_driver.open_calls == 2U);
+    assert(master_valve_service_state(&master_service) == MASTER_VALVE_STATE_OPENING);
+    assert(program_service_process(&program_service) == IRRIGATION_RESULT_OK);
+    assert(zone_driver.reported_outputs[0]);
 
     virtual_output_driver_init(&zone_driver, (Logger){0});
     fake_master_valve_driver_init(&master_driver);
@@ -1766,6 +1893,7 @@ int main(void)
     test_configuration_manager_persistence_boot_fallbacks();
     test_configuration_manager_mutations();
     test_dev_kit_zone_names();
+    test_shelly_master_valve_driver();
     test_configuration_manager_preserves_scheduler_occurrence();
     test_configuration_manager_scheduler_reconfiguration_failure_rolls_back();
     test_open_close_and_authority();
@@ -1782,7 +1910,7 @@ int main(void)
     test_program_single_and_multi_zone_sequences();
     test_program_zero_durations_complete_deterministically();
     test_program_faults_on_master_or_zone_failures();
-    test_program_faults_on_master_close_failure_and_aborts_safely();
+    test_program_completes_on_master_close_failure_and_aborts_safely();
     test_program_execution_history_lifecycle();
     test_scheduler_does_not_catch_up_or_replay_unchanged_entries();
     test_scheduler_recurs_without_duplicate_starts();

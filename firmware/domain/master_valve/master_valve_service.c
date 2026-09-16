@@ -34,7 +34,7 @@ IrrigationResult master_valve_service_open(MasterValveService *service)
     }
     MasterValveState state = state_store_snapshot(service->state_store).master_valve.state;
     printf("master_valve: open requested state=%d\n", state);
-    if (state != MASTER_VALVE_STATE_CLOSED) {
+    if (state != MASTER_VALVE_STATE_CLOSED && state != MASTER_VALVE_STATE_FAULT) {
         operation_lock_release(service);
         return IRRIGATION_RESULT_INVALID_STATE;
     }

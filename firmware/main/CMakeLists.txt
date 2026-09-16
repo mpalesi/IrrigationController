@@ -38,6 +38,9 @@ elseif(CONFIG_IRRIGATION_TARGET_IRRIGATION_CONTROLLER)
     list(APPEND IRRIGATION_SOURCES
         "../hal/outputs/irrigation_controller_output_driver.c"
         "../hal/mcp23017/mcp23017.c"
+        "../hal/master_valve/shelly_http_transport.c"
+        "../hal/master_valve/shelly_master_valve_driver.c"
+        "../hal/master_valve/esp_shelly_http_transport.c"
         "../hal/boards/irrigation_controller_board.c"
     )
 else()
@@ -50,6 +53,9 @@ else()
     list(APPEND IRRIGATION_SOURCES
         "../hal/outputs/irrigation_controller_output_driver.c"
         "../hal/mcp23017/mcp23017.c"
+        "../hal/master_valve/shelly_http_transport.c"
+        "../hal/master_valve/shelly_master_valve_driver.c"
+        "../hal/master_valve/esp_shelly_http_transport.c"
         "../hal/boards/irrigation_controller_board.c"
     )
 endif()
@@ -59,4 +65,14 @@ idf_component_register(
     INCLUDE_DIRS
         "."
         ".."
+    PRIV_REQUIRES
+        driver
+        esp_event
+        esp_http_client
+        esp_http_server
+        esp_netif
+        esp_timer
+        esp_wifi
+        lwip
+        nvs_flash
 )

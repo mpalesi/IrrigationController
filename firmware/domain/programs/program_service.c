@@ -194,10 +194,11 @@ IrrigationResult program_service_process(ProgramService *service)
                    service->program->post_program_delay_ms) {
         printf("program_service: request master close\n");
         result = master_valve_service_close(service->master_valve_service);
-        finish(service, result == IRRIGATION_RESULT_OK ? PROGRAM_STATE_COMPLETED : PROGRAM_STATE_FAULT,
-               result == IRRIGATION_RESULT_OK ? PROGRAM_EXECUTION_RESULT_COMPLETED : PROGRAM_EXECUTION_RESULT_FAULT);
-        printf("program_service: state %s result=%d\n",
-               result == IRRIGATION_RESULT_OK ? "COMPLETED" : "FAULT", result);
+        if (result != IRRIGATION_RESULT_OK) {
+            printf("program_service: all zones completed; master close confirmation failed result=%d\n", result);
+        }
+        finish(service, PROGRAM_STATE_COMPLETED, PROGRAM_EXECUTION_RESULT_COMPLETED);
+        printf("program_service: state COMPLETED result=%d\n", result);
     }
     operation_lock_release(service);
     return result;

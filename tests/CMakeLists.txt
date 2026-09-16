@@ -19,6 +19,8 @@ add_executable(unit_tests
     ../firmware/domain/zones/zone_start_precondition.c
     ../firmware/domain/master_valve/master_valve_driver.c
     ../firmware/domain/master_valve/master_valve_service.c
+    ../firmware/hal/master_valve/shelly_http_transport.c
+    ../firmware/hal/master_valve/shelly_master_valve_driver.c
     ../firmware/domain/programs/program_service.c
     ../firmware/domain/programs/program_execution.c
     ../firmware/domain/history/program_execution_history.c

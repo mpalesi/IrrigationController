@@ -23,4 +23,27 @@ config IRRIGATION_WIFI_PASSWORD
     string "DEV_KIT Wi-Fi password"
     default ""
 
+if IRRIGATION_TARGET_IRRIGATION_CONTROLLER
+
+config IRRIGATION_SHELLY_MASTER_VALVE_HOST
+    string "Shelly master-valve hostname or IP"
+    default ""
+
+config IRRIGATION_SHELLY_MASTER_VALVE_PORT
+    int "Shelly master-valve HTTP port"
+    range 1 65535
+    default 80
+
+config IRRIGATION_SHELLY_MASTER_VALVE_SWITCH_ID
+    int "Shelly master-valve switch ID"
+    range 0 255
+    default 0
+
+config IRRIGATION_SHELLY_MASTER_VALVE_OPERATION_TIMEOUT_MS
+    int "Shelly master-valve operation timeout (ms)"
+    range 100 30000
+    default 3000
+
+endif
+
 endmenu

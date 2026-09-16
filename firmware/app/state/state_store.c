@@ -214,7 +214,8 @@ IrrigationResult state_store_configure_master_valve(StateStore *store, uint32_t 
 
 IrrigationResult state_store_begin_master_valve_open(StateStore *store, uint64_t confirmed_at_ms)
 {
-    if (store == NULL || store->current.master_valve.state != MASTER_VALVE_STATE_CLOSED) {
+    if (store == NULL || (store->current.master_valve.state != MASTER_VALVE_STATE_CLOSED &&
+                          store->current.master_valve.state != MASTER_VALVE_STATE_FAULT)) {
         return IRRIGATION_RESULT_INVALID_STATE;
     }
     store->current.master_valve.state = MASTER_VALVE_STATE_OPENING;
