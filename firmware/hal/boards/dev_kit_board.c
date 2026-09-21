@@ -25,3 +25,8 @@ MasterValveDriver *board_master_valve_driver(void)
     }
     return &driver.base;
 }
+
+StatusLedDriver *board_status_led_driver(void)
+{
+    return NULL;
+}

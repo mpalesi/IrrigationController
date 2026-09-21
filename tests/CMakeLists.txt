@@ -11,6 +11,7 @@ add_executable(unit_tests
     ../firmware/app/configuration/irrigation_configuration.c
     ../firmware/infrastructure/persistence/configuration_repository.c
     ../firmware/app/state/state_store.c
+    ../firmware/app/status/status_led_service.c
     ../firmware/app/clock.c
     ../firmware/app/commands/command_bus.c
     ../firmware/app/commands/zone_command_handler.c
@@ -28,8 +29,19 @@ add_executable(unit_tests
     ../firmware/interfaces/http/dev_kit_zone_configuration.c
     ../firmware/infrastructure/logging/logger.c
     ../firmware/hal/outputs/output_driver.c
+    ../firmware/hal/status_led/status_led_driver.c
     ../firmware/hal/outputs/virtual_output_driver.c
 )
 target_include_directories(unit_tests PRIVATE ../firmware)
 target_compile_options(unit_tests PRIVATE -Wall -Wextra -Werror)
 add_test(NAME unit_tests COMMAND unit_tests)
+
+add_executable(status_led_driver_tests
+    unit/test_status_led_driver.c
+    ../firmware/app/status/status_led_service.c
+    ../firmware/hal/status_led/status_led_driver.c
+    ../firmware/hal/status_led/irrigation_controller_status_led_driver.c
+)
+target_include_directories(status_led_driver_tests PRIVATE stubs/status_led ../firmware)
+target_compile_options(status_led_driver_tests PRIVATE -Wall -Wextra -Werror)
+add_test(NAME status_led_driver_tests COMMAND status_led_driver_tests)

@@ -18,6 +18,7 @@
 #include "app/events/event_bus.h"
 #include "app/result.h"
 #include "app/state/state_store.h"
+#include "app/status/status_led_service.h"
 #include "domain/master_valve/master_valve_service.h"
 #include "domain/history/program_execution_history.h"
 #include "domain/outputs/output.h"
@@ -41,6 +42,7 @@ static SemaphoreHandle_t scheduler_configuration_mutex;
 static DevKitWebContext web_context;
 static ConfigurationManager configuration_manager;
 static ConfigurationRepository configuration_repository;
+static StatusLedService status_led_service;
 
 static const Output DEV_OUTPUTS[] = {
     {.id = "dev-output-1", .driver_output_index = 0U},
@@ -55,6 +57,12 @@ static const Zone DEV_ZONES[] = {
     {.id = "zone-4", .output = &DEV_OUTPUTS[3], .enabled = true, .default_duration_ms = 30000U},
 };
 static void initialize_local_time(void);
+
+static void indicate_status_fault(void)
+{
+    status_led_service_set_fault(&status_led_service, true);
+    status_led_service_refresh(&status_led_service);
+}
 
 static void scheduler_lock(void *context)
 {
@@ -103,6 +111,11 @@ static void scheduler_task(void *context)
         if (program_service_is_active(&program_service)) {
             (void)program_service_process(&program_service);
         }
+        const RuntimeState status_state = state_store_snapshot(&state_store);
+        status_led_service_set_fault(&status_led_service,
+                                     status_state.system_state == SYSTEM_STATE_ERROR ||
+                                     status_state.master_valve.state == MASTER_VALVE_STATE_FAULT);
+        status_led_service_refresh(&status_led_service);
         if (++tick_count >= 150U) {
             SchedulerTime now;
             if (scheduler_time_from_system(&now)) {
@@ -119,13 +132,16 @@ static void wifi_event_handler(void *argument, esp_event_base_t event_base, int3
     (void)argument;
     (void)event_data;
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        status_led_service_set_network_connected(&status_led_service, false);
         (void)esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         ESP_LOGW(TAG, "Wi-Fi disconnected; reconnecting");
+        status_led_service_set_network_connected(&status_led_service, false);
         (void)esp_wifi_connect();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         const ip_event_got_ip_t *event = event_data;
         ESP_LOGI(TAG, "Wi-Fi connected, IP=" IPSTR, IP2STR(&event->ip_info.ip));
+        status_led_service_set_network_connected(&status_led_service, true);
         dev_kit_web_start(&web_context);
     }
 }
@@ -134,6 +150,7 @@ static void initialize_wifi(void)
 {
     if (CONFIG_IRRIGATION_WIFI_SSID[0] == '\0') {
         ESP_LOGW(TAG, "Wi-Fi SSID is not configured; web UI is disabled");
+        status_led_service_set_network_connected(&status_led_service, false);
         return;
     }
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -208,15 +225,18 @@ static bool initialize_configuration(void)
 void app_main(void)
 {
     state_store_init(&state_store);
+    status_led_service_init(&status_led_service, board_status_led_driver());
 
     OutputDriver *output_driver = board_output_driver();
     if (output_driver_initialize_safe_off(output_driver) != IRRIGATION_RESULT_OK) {
         ESP_LOGE(TAG, "safe output initialization failed; remaining in BOOT");
+        indicate_status_fault();
         return;
     }
 
     if (state_store_transition_system(&state_store, SYSTEM_STATE_READY) != IRRIGATION_RESULT_OK) {
         ESP_LOGE(TAG, "unable to enter READY state");
+        indicate_status_fault();
         return;
     }
 
@@ -232,11 +252,13 @@ void app_main(void)
 
     Clock clock = {.now_ms = esp_clock_now_ms, .context = NULL};
     if (!initialize_configuration()) {
+        indicate_status_fault();
         return;
     }
     if (state_store_configure_zones(&state_store, DEV_ZONES,
                                     sizeof(DEV_ZONES) / sizeof(DEV_ZONES[0])) != IRRIGATION_RESULT_OK) {
         ESP_LOGE(TAG, "unable to configure DEV_KIT zones");
+        indicate_status_fault();
         return;
     }
     master_valve_service_init(&master_valve_service, &state_store, board_master_valve_driver(), clock,
@@ -248,12 +270,14 @@ void app_main(void)
     program_execution_history_init(&program_execution_history, (ProgramExecutionHistoryRepository){0});
     if (program_execution_history_subscribe(&program_execution_history, &event_bus) != IRRIGATION_RESULT_OK) {
         ESP_LOGE(TAG, "unable to subscribe program execution history");
+        indicate_status_fault();
         return;
     }
     scheduler_service_init(&scheduler_service, &state_store, &program_service);
     scheduler_configuration_mutex = xSemaphoreCreateMutex();
     if (scheduler_configuration_mutex == NULL) {
         ESP_LOGE(TAG, "unable to create scheduler configuration mutex");
+        indicate_status_fault();
         return;
     }
     scheduler_service_set_synchronization(&scheduler_service, (SchedulerServiceSynchronization){
@@ -262,6 +286,7 @@ void app_main(void)
     if (configuration_manager_configure_scheduler(&configuration_manager, &scheduler_service) !=
         IRRIGATION_RESULT_OK) {
         ESP_LOGE(TAG, "unable to configure scheduler");
+        indicate_status_fault();
         return;
     }
     configuration_manager_bind_scheduler(&configuration_manager, &scheduler_service);

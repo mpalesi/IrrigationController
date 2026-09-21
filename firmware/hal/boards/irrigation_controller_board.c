@@ -3,6 +3,7 @@
 #include "hal/master_valve/esp_shelly_http_transport.h"
 #include "hal/master_valve/shelly_master_valve_driver.h"
 #include "hal/outputs/irrigation_controller_output_driver.h"
+#include "hal/status_led/irrigation_controller_status_led_driver.h"
 #include "infrastructure/logging/esp_idf_logger.h"
 
 OutputDriver *board_output_driver(void)
@@ -29,6 +30,17 @@ MasterValveDriver *board_master_valve_driver(void)
             .switch_id = CONFIG_IRRIGATION_SHELLY_MASTER_VALVE_SWITCH_ID,
             .operation_timeout_ms = CONFIG_IRRIGATION_SHELLY_MASTER_VALVE_OPERATION_TIMEOUT_MS,
         });
+        initialized = true;
+    }
+    return &driver.base;
+}
+
+StatusLedDriver *board_status_led_driver(void)
+{
+    static IrrigationControllerStatusLedDriver driver;
+    static bool initialized;
+    if (!initialized) {
+        (void)irrigation_controller_status_led_driver_init(&driver);
         initialized = true;
     }
     return &driver.base;

@@ -9,6 +9,7 @@
 #include "app/configuration/configuration_manager.h"
 #include "app/events/event_bus.h"
 #include "app/state/state_store.h"
+#include "app/status/status_led_service.h"
 #include "domain/master_valve/master_valve_service.h"
 #include "domain/history/program_execution_history.h"
 #include "domain/outputs/output.h"
@@ -53,6 +54,12 @@ typedef struct {
     unsigned int open_calls;
     unsigned int close_calls;
 } FakeMasterValveDriver;
+
+typedef struct {
+    StatusLedDriver base;
+    StatusLedState state;
+    size_t set_calls;
+} FakeStatusLedDriver;
 
 typedef struct {
     IrrigationResult result;
@@ -669,6 +676,48 @@ static void test_dev_kit_zone_names(void)
     assert(strcmp(step.zone_id, "zone-1") == 0);
     assert(dev_kit_zone_configuration_set_name(&configuration, 0U, "") == IRRIGATION_RESULT_REJECTED);
     assert(dev_kit_zone_configuration_set_name(&configuration, 0U, too_long) == IRRIGATION_RESULT_REJECTED);
+}
+
+static IrrigationResult fake_status_led_set_state(StatusLedDriver *base, StatusLedState state)
+{
+    FakeStatusLedDriver *driver = (FakeStatusLedDriver *)base;
+    driver->state = state;
+    driver->set_calls++;
+    return IRRIGATION_RESULT_OK;
+}
+
+static const StatusLedDriverVTable FAKE_STATUS_LED_DRIVER_VTABLE = {
+    .set_state = fake_status_led_set_state,
+};
+
+static void test_status_led_service_priority_and_transitions(void)
+{
+    FakeStatusLedDriver driver = {.base.vtable = &FAKE_STATUS_LED_DRIVER_VTABLE};
+    StatusLedService service;
+
+    status_led_service_init(&service, &driver.base);
+    assert(driver.state == STATUS_LED_STATE_BOOTING && driver.set_calls == 1U);
+
+    status_led_service_set_network_connected(&service, true);
+    assert(status_led_service_state(&service) == STATUS_LED_STATE_READY);
+    status_led_service_refresh(&service);
+    assert(driver.state == STATUS_LED_STATE_READY);
+
+    status_led_service_set_network_connected(&service, false);
+    assert(status_led_service_state(&service) == STATUS_LED_STATE_NETWORK_DISCONNECTED);
+    status_led_service_refresh(&service);
+    assert(driver.state == STATUS_LED_STATE_NETWORK_DISCONNECTED);
+
+    status_led_service_set_fault(&service, true);
+    status_led_service_set_network_connected(&service, true);
+    assert(status_led_service_state(&service) == STATUS_LED_STATE_FAULT);
+    status_led_service_refresh(&service);
+    assert(driver.state == STATUS_LED_STATE_FAULT);
+
+    status_led_service_set_fault(&service, false);
+    assert(status_led_service_state(&service) == STATUS_LED_STATE_READY);
+    status_led_service_refresh(&service);
+    assert(driver.state == STATUS_LED_STATE_READY);
 }
 
 static IrrigationResult fake_shelly_http_get(ShellyHttpTransport *base, const char *host, uint16_t port,
@@ -1893,6 +1942,7 @@ int main(void)
     test_configuration_manager_persistence_boot_fallbacks();
     test_configuration_manager_mutations();
     test_dev_kit_zone_names();
+    test_status_led_service_priority_and_transitions();
     test_shelly_master_valve_driver();
     test_configuration_manager_preserves_scheduler_occurrence();
     test_configuration_manager_scheduler_reconfiguration_failure_rolls_back();

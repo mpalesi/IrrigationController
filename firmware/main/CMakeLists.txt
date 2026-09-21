@@ -7,6 +7,7 @@ set(IRRIGATION_APPLICATION_SOURCES
     "../infrastructure/persistence/configuration_repository.c"
     "../infrastructure/persistence/nvs_configuration_repository.c"
     "../app/state/state_store.c"
+    "../app/status/status_led_service.c"
     "../app/clock.c"
     "../app/commands/command_bus.c"
     "../app/commands/zone_command_handler.c"
@@ -22,6 +23,7 @@ set(IRRIGATION_APPLICATION_SOURCES
     "../infrastructure/logging/logger.c"
     "../infrastructure/logging/esp_idf_logger.c"
     "../hal/outputs/output_driver.c"
+    "../hal/status_led/status_led_driver.c"
 )
 
 if(CONFIG_IRRIGATION_TARGET_DEV_KIT)
@@ -41,6 +43,7 @@ elseif(CONFIG_IRRIGATION_TARGET_IRRIGATION_CONTROLLER)
         "../hal/master_valve/shelly_http_transport.c"
         "../hal/master_valve/shelly_master_valve_driver.c"
         "../hal/master_valve/esp_shelly_http_transport.c"
+        "../hal/status_led/irrigation_controller_status_led_driver.c"
         "../hal/boards/irrigation_controller_board.c"
     )
 else()
@@ -56,6 +59,7 @@ else()
         "../hal/master_valve/shelly_http_transport.c"
         "../hal/master_valve/shelly_master_valve_driver.c"
         "../hal/master_valve/esp_shelly_http_transport.c"
+        "../hal/status_led/irrigation_controller_status_led_driver.c"
         "../hal/boards/irrigation_controller_board.c"
     )
 endif()
